@@ -2,7 +2,7 @@ const std = @import("std");
 
 // Constants for project configuration
 const PROJECT_NAME = "zeta";
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -330,3 +330,4 @@ pub fn build(b: *std.Build) void {
         build_all_step.dependOn(step);
     }
 }
+
