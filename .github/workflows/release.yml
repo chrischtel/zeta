@@ -22,8 +22,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          name: Zeta ${{ github.ref }}
+          tag_name: ${{ github.ref_name }}
+          name: Zeta ${{ github.ref_name }}
           body_path: CHANGELOG.md
           draft: false
           prerelease: false
