@@ -1,3 +1,9 @@
+# Zeta 0.1.2
+
+- fixed release scirpt
+- fixed workflow
+- ye
+
 # Zeta 0.1.1
 
 - fixed a bug
@@ -8,4 +14,5 @@
 # Changelog
 
 All notable changes to Zeta will be documented in this file.
+
 
