@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Needed to get git commit info
+      - uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.14.0
+      - name: Build
+        run: zig build
+      - name: Test
+        run: zig build test
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.14.0
+      - name: Lint code
+        run: zig fmt --check src/
