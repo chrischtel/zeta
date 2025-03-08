@@ -1,3 +1,7 @@
+# Zeta 0.2.0
+
+
+
 # Zeta 0.1.1
 
  (Build: c87400c)
@@ -173,6 +177,7 @@
 # Changelog
 
 All notable changes to Zeta will be documented in this file.
+
 
 
 
