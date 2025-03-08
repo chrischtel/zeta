@@ -1,0 +1,68 @@
+name: Release Pre-release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - 'v*-alpha.*'
+      - 'v*-beta.*'
+      - 'v*-rc.*'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Needed for git history
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Zeta ${{ github.ref_name }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: true  # <---- IMPORTANT:  Mark as a pre-release
+
+  build-and-upload:
+    needs: create-release
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x86_64
+          - os: macos-latest
+            platform: macos-aarch64
+          - os: windows-latest
+            platform: windows-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Needed for git commit info
+      - uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.14.0
+      - name: Build
+        run: zig build build-${{ matrix.platform }} -Doptimize=ReleaseFast
+      - name: Package binaries
+        run: |
+          mkdir -p dist
+          cp zig-out/bin/${{ matrix.platform }}/* dist/
+          cd dist && tar czf zeta-${{ matrix.platform }}.tar.gz *
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./dist/zeta-${{ matrix.platform }}.tar.gz
+          asset_name: zeta-${{ matrix.platform }}.tar.gz
+          asset_content_type: application/gzip

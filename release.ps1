@@ -1,15 +1,15 @@
 # release.ps1 - Version bumping for Zeta project
-# Usage: 
-#   .\release.ps1 [major|minor|patch] 
+# Usage:
+#   .\release.ps1 [major|minor|patch]
 #   .\release.ps1 [major|minor|patch] -PreReleaseType alpha -PreReleaseVersion 1
 
 param(
     [Parameter(Position = 0)]
     [string]$VersionType = "patch",
-    
+
     [Parameter()]
     [string]$PreReleaseType = "",
-    
+
     [Parameter()]
     [string]$PreReleaseVersion = ""
 )
@@ -27,7 +27,7 @@ if ($PreReleaseType -ne "") {
     if ($PreReleaseType -notin @("alpha", "beta", "rc")) {
         Write-Warning "Unusual prerelease type: $PreReleaseType. Common types are alpha, beta, rc."
     }
-    
+
     if ($PreReleaseVersion -eq "") {
         $PreReleaseVersion = "1" # Default to 1 if not specified
     }
@@ -74,15 +74,18 @@ switch ($VersionType) {
 # Create new version string
 $newVersion = "$major.$minor.$patch"
 
-# Add prerelease and build info if applicable
+# Add prerelease info AND Git hash if applicable
 if ($isPreRelease) {
-    $newVersion = "$newVersion-$PreReleaseType.$PreReleaseVersion+$gitHash"
+    $fullVersion = "$newVersion-$PreReleaseType.$PreReleaseVersion+$gitHash" # Include Git hash for pre-releases
+}
+else {
+    $fullVersion = $newVersion # No Git hash for official releases
 }
 
-Write-Host "Bumping version: $currentVersion → $newVersion"
+Write-Host "Bumping version: $currentVersion → $fullVersion"
 
 # Update version in build.zig
-$updatedContent = $buildContent -replace $versionPattern, "const VERSION = `"$newVersion`""
+$updatedContent = $buildContent -replace $versionPattern, "const VERSION = `"$fullVersion`""
 Set-Content -Path "build.zig" -Value $updatedContent
 
 # Get most recent tag
@@ -103,6 +106,11 @@ else {
     $changes = git log --pretty=format:"- %s"
 }
 
+# Append Git hash to the changelog entry IFF it's a pre-release
+if ($isPreRelease) {
+    $changelogHeader = "$changelogHeader (Build: $gitHash)`n`n"
+}
+
 $existingChangelog = Get-Content -Path "CHANGELOG.md" -Raw -ErrorAction SilentlyContinue
 if (-not $existingChangelog) {
     $existingChangelog = "# Changelog`n`nAll notable changes to Zeta will be documented in this file.`n"
@@ -116,13 +124,7 @@ Set-Content -Path "CHANGELOG.md" -Value $newChangelog
 git add build.zig CHANGELOG.md
 git commit -m "chore: bump version to $newVersion"
 
-# Only create a tag if this is not a prerelease
-if (-not $isPreRelease) {
-    git tag -a "v$newVersion" -m "Release v$newVersion"
-    Write-Host "Version bumped to $newVersion and tagged."
-    Write-Host "Run 'git push && git push --tags' to publish the new version."
-}
-else {
-    Write-Host "Prerelease version bumped to $newVersion (not tagged)."
-    Write-Host "Run 'git push' to publish the changes."
-}
+# Create a tag ALWAYS, using the base version
+git tag -a "v$newVersion" -m "Release v$newVersion"
+Write-Host "Version bumped to $fullVersion and tagged."
+Write-Host "Run 'git push && git push --tags' to publish the new version."
