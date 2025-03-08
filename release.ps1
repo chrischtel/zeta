@@ -28,9 +28,9 @@ if ($PreReleaseType -ne "") {
         Write-Warning "Unusual prerelease type: $PreReleaseType. Common types are alpha, beta, rc."
     }
 
-    if ($PreReleaseVersion -eq "") {
-        $PreReleaseVersion = "1" # Default to 1 if not specified
-    }
+    #if ($PreReleaseVersion -eq "") { #No longer needed because we increment it in the script now
+    #    $PreReleaseVersion = "1" # Default to 1 if not specified
+    #}
 }
 
 # Get current git hash
@@ -74,8 +74,22 @@ switch ($VersionType) {
 # Create new version string
 $newVersion = "$major.$minor.$patch"
 
-# Add prerelease info AND Git hash if applicable
+# Handle Pre-release versioning
 if ($isPreRelease) {
+    #Check if there is a prerelease number
+    if ($currentVersion -match "-$PreReleaseType\.(\d+)$") {
+        #Get the current prerelease version
+        $currentPreReleaseVersion = [int]$Matches[1]
+
+        #Increment it
+        $PreReleaseVersion = $currentPreReleaseVersion + 1
+        Write-Host "Incrementing existing $PreReleaseType version to $PreReleaseVersion"
+    }
+    else {
+        #No existing prerelease number, so use 1
+        $PreReleaseVersion = 1
+        Write-Host "Setting $PreReleaseType version to $PreReleaseVersion"
+    }
     $fullVersion = "$newVersion-$PreReleaseType.$PreReleaseVersion+$gitHash" # Include Git hash for pre-releases
 }
 else {
@@ -134,4 +148,3 @@ else {
     Write-Host "Version bumped to $fullVersion and tagged."
 }
 Write-Host "Run 'git push && git push --tags' to publish the new version."
-
