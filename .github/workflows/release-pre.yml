@@ -2,6 +2,7 @@ name: Release Pre-release
 
 permissions:
   contents: write
+  pull-requests: write
 
 on:
   push:
@@ -74,21 +75,72 @@ jobs:
         run: |
           mkdir -p dist
           
-          # Copy the minimal version
-          cp zig-out/bin/${{ matrix.platform }}/zeta-${{ matrix.platform }} dist/zeta
-          cd dist && tar czf zeta-minimal-${{ matrix.platform }}.tar.gz zeta
-          rm zeta
+          # Check build directory structure
+          echo "Checking build output structure:"
+          find zig-out -type f -name "*" | sort
           
-          # Copy the full version
-          cp ../zig-out/bin/${{ matrix.platform }}/zetaf-${{ matrix.platform }} dist/zetaf
-          tar czf zeta-full-${{ matrix.platform }}.tar.gz zetaf
+          # Default filename patterns - modify if needed
+          MINIMAL_BIN="zeta-${{ matrix.platform }}"
+          FULL_BIN="zetaf-${{ matrix.platform }}"
           
-          # Optional combined package
-          cd .. && cp zig-out/bin/${{ matrix.platform }}/* dist/
-          cd dist && tar czf zeta-complete-${{ matrix.platform }}.tar.gz *
+          # Try to find binaries with more flexible patterns if exact match fails
+          if [ ! -f "zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN" ]; then
+            echo "Couldn't find expected minimal binary, searching for alternatives..."
+            MINIMAL_BIN=$(find zig-out -type f -name "zeta*" | grep -v "zetaf" | head -1 | xargs basename || echo "")
+            if [ -n "$MINIMAL_BIN" ]; then
+              echo "Found alternative minimal binary: $MINIMAL_BIN"
+            else
+              echo "No minimal binary found, skipping minimal package"
+            fi
+          fi
+          
+          if [ ! -f "zig-out/bin/${{ matrix.platform }}/$FULL_BIN" ]; then
+            echo "Couldn't find expected full binary, searching for alternatives..."
+            FULL_BIN=$(find zig-out -type f -name "zetaf*" | head -1 | xargs basename || echo "")
+            if [ -n "$FULL_BIN" ]; then
+              echo "Found alternative full binary: $FULL_BIN" 
+            else
+              echo "No full binary found, skipping full package"
+            fi
+          fi
+          
+          # Create minimal package if binary exists
+          if [ -n "$MINIMAL_BIN" ] && [ -f "zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN" ]; then
+            echo "Creating minimal package..."
+            cp zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN dist/zeta
+            cd dist && tar czf zeta-minimal-${{ matrix.platform }}.tar.gz zeta
+            rm zeta
+            cd ..
+          else
+            echo "Skipping minimal package creation"
+          fi
+          
+          # Create full package if binary exists
+          if [ -n "$FULL_BIN" ] && [ -f "zig-out/bin/${{ matrix.platform }}/$FULL_BIN" ]; then
+            echo "Creating full package..."
+            cp zig-out/bin/${{ matrix.platform }}/$FULL_BIN dist/zetaf
+            cd dist && tar czf zeta-full-${{ matrix.platform }}.tar.gz zetaf
+            rm zetaf
+            cd ..
+          else
+            echo "Skipping full package creation"
+          fi
+          
+          # Create complete package with all binaries
+          echo "Creating complete package with all available binaries..."
+          find zig-out/bin/${{ matrix.platform }} -type f -exec cp {} dist/ \; || echo "No binaries found to copy"
+          ls -la dist/
+          if [ "$(ls -A dist)" ]; then
+            cd dist && tar czf zeta-complete-${{ matrix.platform }}.tar.gz * && cd ..
+          else
+            echo "No files available for complete package"
+            exit 1
+          fi
+      
 
       - name: Upload Minimal Release Asset
         uses: actions/upload-release-asset@v1
+        if: fileExists('./dist/zeta-minimal-${{ matrix.platform }}.tar.gz')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -96,9 +148,10 @@ jobs:
           asset_path: ./dist/zeta-minimal-${{ matrix.platform }}.tar.gz
           asset_name: zeta-minimal-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz
           asset_content_type: application/gzip
-
+        
       - name: Upload Full Release Asset
         uses: actions/upload-release-asset@v1
+        if: fileExists('./dist/zeta-full-${{ matrix.platform }}.tar.gz')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -106,3 +159,4 @@ jobs:
           asset_path: ./dist/zeta-full-${{ matrix.platform }}.tar.gz
           asset_name: zeta-full-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz
           asset_content_type: application/gzip
+      
