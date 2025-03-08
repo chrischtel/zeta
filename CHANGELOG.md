@@ -1,3 +1,9 @@
+# Zeta 0.1.8
+
+ (Build: 4627edc)
+
+
+
 # Zeta 0.1.7
 
  (Build: 63bd1d9)
@@ -48,6 +54,7 @@
 # Changelog
 
 All notable changes to Zeta will be documented in this file.
+
 
 
 
