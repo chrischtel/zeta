@@ -34,9 +34,8 @@ pub fn formatPermissions(allocator: Allocator, perms: FilePermissions, file_type
         // For Windows, use a simpler attribute-based format
         var attrs = [_]u8{ '-', '-', '-', '-' };
 
-        if (perms.readonly) attrs[0] = 'R';
+        if (perms.readable) attrs[0] = 'R';
         if (perms.hidden) attrs[1] = 'H';
-        if (perms.system) attrs[2] = 'S';
 
         // Show directory/archive attribute
         if (file_type == .directory) {
@@ -82,45 +81,52 @@ pub fn formatPermissions(allocator: Allocator, perms: FilePermissions, file_type
     }
 }
 
-/// Format timestamp as a human-readable date in a locale-aware way
+/// Format timestamp as a human-readable date
 pub fn formatTime(allocator: Allocator, timestamp: i128) ![]const u8 {
     // Convert nanoseconds to seconds
-    const seconds = @divFloor(timestamp, time.ns_per_s);
+    const seconds: i64 = @intCast(@divFloor(timestamp, std.time.ns_per_s));
 
-    // Get current year for comparison
-    const current_time = time.timestamp();
-    const current_tm = time.localtime(current_time);
-    const current_year = current_tm.year + 1900;
+    // Get current time for comparison
+    const current_time = std.time.timestamp();
 
-    // Convert to local time
-    const tm = time.localtime(@intCast(seconds));
+    // Simple timestamp formatting without locale-specific functions
+    var epoch_seconds: i64 = seconds;
 
-    // If the file is from the current year, show month, day, time
-    // Otherwise show month, day, year
-    if (tm.year + 1900 == current_year) {
-        return std.fmt.allocPrint(
-            allocator,
-            "{s} {:2} {:02}:{:02}",
-            .{
-                getMonthName(tm.mon),
-                tm.mday,
-                tm.hour,
-                tm.min,
-            },
-        );
+    // Extract time components manually (simplified version)
+    const seconds_per_day: i64 = 86400;
+    const seconds_per_hour: i64 = 3600;
+    const seconds_per_minute: i64 = 60;
+
+    // Days since epoch (Jan 1, 1970)
+    const days_since_epoch = @divFloor(epoch_seconds, seconds_per_day);
+    epoch_seconds -= days_since_epoch * seconds_per_day;
+
+    // Extract hour, minute
+    const hour = @divFloor(epoch_seconds, seconds_per_hour);
+    epoch_seconds -= hour * seconds_per_hour;
+
+    const minute = @divFloor(epoch_seconds, seconds_per_minute);
+
+    // Simple date formatting - just show the timestamp in a basic format
+    // In a real implementation, you'd want proper date calculation
+    const is_recent = (current_time - seconds) < (365 * 24 * 60 * 60);
+
+    if (is_recent) {
+        // For recent files, show a relative time
+        const days_ago = @divFloor(current_time - seconds, seconds_per_day);
+
+        if (days_ago == 0) {
+            return std.fmt.allocPrint(allocator, "Today {:02}:{:02}", .{ hour, minute });
+        } else if (days_ago == 1) {
+            return std.fmt.allocPrint(allocator, "Yesterday", .{});
+        } else {
+            return std.fmt.allocPrint(allocator, "{d} days ago", .{days_ago});
+        }
     } else {
-        return std.fmt.allocPrint(
-            allocator,
-            "{s} {:2} {:4}",
-            .{
-                getMonthName(tm.mon),
-                tm.mday,
-                tm.year + 1900,
-            },
-        );
+        // For older files, show days since epoch (very simplified)
+        return std.fmt.allocPrint(allocator, "{d} days ago", .{@divFloor(current_time - seconds, seconds_per_day)});
     }
 }
-
 /// Generate file type icon in a cross-platform way
 pub fn getFileIcon(file_type: FileType, extension: []const u8) []const u8 {
     _ = extension; // Will use in full version
