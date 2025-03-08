@@ -1,5 +1,11 @@
 # Zeta 0.2.0
 
+ (Build: aaa2fb9)
+
+
+
+# Zeta 0.2.0
+
 
 
 # Zeta 0.1.1
@@ -177,6 +183,7 @@
 # Changelog
 
 All notable changes to Zeta will be documented in this file.
+
 
 
 
