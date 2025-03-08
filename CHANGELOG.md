@@ -1,5 +1,16 @@
 # Zeta 0.2.0
 
+ (Build: f5ef7b1)
+
+- Refactor release workflow to use step output for versioning in PR creation
+- Optimizes file permission string formatting
+- hotfix
+- Merge branch 'setup/gitflow-workflows'
+- Changed workldowe
+- Merge pull request #1 from chrischtel/develop
+
+# Zeta 0.2.0
+
  (Build: aaa2fb9)
 
 
@@ -183,6 +194,7 @@
 # Changelog
 
 All notable changes to Zeta will be documented in this file.
+
 
 
 
