@@ -12,18 +12,28 @@ on:
 
 jobs:
   ci:
-    uses: ./.github/workflows/ci.yml # Call the CI workflow
+    uses: ./.github/workflows/ci.yml
     secrets: inherit
+    with:
+      skip-tests: false
 
   create-release:
-    needs: ci # <---- Depends on the ci job
+    needs: ci
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.extract_version.outputs.version }}
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Needed for git history
+          fetch-depth: 0
+      
+      - name: Extract version
+        id: extract_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+      
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v2
@@ -34,7 +44,7 @@ jobs:
           name: Zeta ${{ github.ref_name }}
           body_path: CHANGELOG.md
           draft: false
-          prerelease: true  # <---- IMPORTANT:  Mark as a pre-release
+          prerelease: true
 
   build-and-upload:
     needs: create-release
@@ -51,46 +61,48 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Needed for git commit info
+          fetch-depth: 0
+      
       - uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.14.0
+      
       - name: Build
         run: zig build build-${{ matrix.platform }} -Doptimize=ReleaseFast
+      
       - name: Package binaries
         run: |
-            mkdir -p dist
-            
-            # Copy the minimal version
-            cp zig-out/bin/${{ matrix.platform }}/zeta-${{ matrix.platform }} dist/zeta
-            cd dist && tar czf zeta-minimal-${{ matrix.platform }}.tar.gz zeta
-            rm zeta
-            
-            # Copy the full version
-            cp ../zig-out/bin/${{ matrix.platform }}/zetaf-${{ matrix.platform }} dist/zetaf
-            tar czf zeta-full-${{ matrix.platform }}.tar.gz zetaf
-            
-            # Optional combined package
-            cd .. && cp zig-out/bin/${{ matrix.platform }}/* dist/
-            cd dist && tar czf zeta-complete-${{ matrix.platform }}.tar.gz *
+          mkdir -p dist
+          
+          # Copy the minimal version
+          cp zig-out/bin/${{ matrix.platform }}/zeta-${{ matrix.platform }} dist/zeta
+          cd dist && tar czf zeta-minimal-${{ matrix.platform }}.tar.gz zeta
+          rm zeta
+          
+          # Copy the full version
+          cp ../zig-out/bin/${{ matrix.platform }}/zetaf-${{ matrix.platform }} dist/zetaf
+          tar czf zeta-full-${{ matrix.platform }}.tar.gz zetaf
+          
+          # Optional combined package
+          cd .. && cp zig-out/bin/${{ matrix.platform }}/* dist/
+          cd dist && tar czf zeta-complete-${{ matrix.platform }}.tar.gz *
 
       - name: Upload Minimal Release Asset
         uses: actions/upload-release-asset@v1
         env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-            upload_url: ${{ needs.create-release.outputs.upload_url }}
-            asset_path: ./dist/zeta-minimal-${{ matrix.platform }}.tar.gz
-            asset_name: zeta-minimal-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz
-            asset_content_type: application/gzip
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./dist/zeta-minimal-${{ matrix.platform }}.tar.gz
+          asset_name: zeta-minimal-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz
+          asset_content_type: application/gzip
 
-       - name: Upload Full Release Asset
+      - name: Upload Full Release Asset
         uses: actions/upload-release-asset@v1
         env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-            upload_url: ${{ needs.create-release.outputs.upload_url }}
-            asset_path: ./dist/zeta-full-${{ matrix.platform }}.tar.gz
-            asset_name: zeta-full-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz
-            asset_content_type: application/gzip
-
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./dist/zeta-full-${{ matrix.platform }}.tar.gz
+          asset_name: zeta-full-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz
+          asset_content_type: application/gzip

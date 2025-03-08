@@ -1,6 +1,8 @@
 name: Release
 permissions:
   contents: write
+  pull-requests: write
+
 
 on:
   push:
@@ -9,18 +11,28 @@ on:
 
 jobs:
   ci:
-    uses: ./.github/workflows/ci.yml # Call the CI workflow
+    uses: ./.github/workflows/ci.yml
     secrets: inherit
+    with:
+      skip-tests: false
 
   create-release:
-    needs: ci  # <---- Depends on the ci job
+    needs: ci
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.extract_version.outputs.version }}
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Needed for git history
+          fetch-depth: 0
+      
+      - name: Extract version
+        id: extract_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+      
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v2
@@ -48,12 +60,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Needed for git commit info
+          fetch-depth: 0
+      
       - uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.14.0
+      
       - name: Build
         run: zig build build-${{ matrix.platform }} -Doptimize=ReleaseFast
+      
       - name: Package binaries
         run: |
           mkdir -p dist
@@ -90,4 +105,3 @@ jobs:
           asset_path: ./dist/zeta-full-${{ matrix.platform }}.tar.gz
           asset_name: zeta-full-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz
           asset_content_type: application/gzip
-
