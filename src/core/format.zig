@@ -82,51 +82,34 @@ pub fn formatPermissions(allocator: Allocator, perms: FilePermissions, file_type
 }
 
 /// Format timestamp as a human-readable date
-pub fn formatTime(allocator: Allocator, timestamp: i128) ![]const u8 {
-    // Convert nanoseconds to seconds
-    const seconds: i64 = @intCast(@divFloor(timestamp, std.time.ns_per_s));
+pub fn formatTime(allocator: Allocator, timestamp_seconds: i64) ![]const u8 {
+    // If timestamp appears to be zero or invalid
+    if (timestamp_seconds <= 0) {
+        return allocator.dupe(u8, "Unknown date");
+    }
 
     // Get current time for comparison
     const current_time = std.time.timestamp();
 
-    // Simple timestamp formatting without locale-specific functions
-    var epoch_seconds: i64 = seconds;
-
-    // Extract time components manually (simplified version)
+    // Simple timestamp formatting
     const seconds_per_day: i64 = 86400;
-    const seconds_per_hour: i64 = 3600;
-    const seconds_per_minute: i64 = 60;
+    const days_ago = @divFloor(current_time - timestamp_seconds, seconds_per_day);
 
-    // Days since epoch (Jan 1, 1970)
-    const days_since_epoch = @divFloor(epoch_seconds, seconds_per_day);
-    epoch_seconds -= days_since_epoch * seconds_per_day;
-
-    // Extract hour, minute
-    const hour = @divFloor(epoch_seconds, seconds_per_hour);
-    epoch_seconds -= hour * seconds_per_hour;
-
-    const minute = @divFloor(epoch_seconds, seconds_per_minute);
-
-    // Simple date formatting - just show the timestamp in a basic format
-    // In a real implementation, you'd want proper date calculation
-    const is_recent = (current_time - seconds) < (365 * 24 * 60 * 60);
-
-    if (is_recent) {
-        // For recent files, show a relative time
-        const days_ago = @divFloor(current_time - seconds, seconds_per_day);
-
-        if (days_ago == 0) {
-            return std.fmt.allocPrint(allocator, "Today {:02}:{:02}", .{ hour, minute });
-        } else if (days_ago == 1) {
-            return std.fmt.allocPrint(allocator, "Yesterday", .{});
-        } else {
-            return std.fmt.allocPrint(allocator, "{d} days ago", .{days_ago});
-        }
+    if (days_ago < 0) {
+        return allocator.dupe(u8, "Future date");
+    } else if (days_ago == 0) {
+        return allocator.dupe(u8, "Today");
+    } else if (days_ago == 1) {
+        return allocator.dupe(u8, "Yesterday");
+    } else if (days_ago < 30) {
+        return std.fmt.allocPrint(allocator, "{d} days ago", .{days_ago});
+    } else if (days_ago < 365) {
+        return std.fmt.allocPrint(allocator, "{d} months ago", .{@divFloor(days_ago, 30)});
     } else {
-        // For older files, show days since epoch (very simplified)
-        return std.fmt.allocPrint(allocator, "{d} days ago", .{@divFloor(current_time - seconds, seconds_per_day)});
+        return std.fmt.allocPrint(allocator, "{d} years ago", .{@divFloor(days_ago, 365)});
     }
 }
+
 /// Generate file type icon in a cross-platform way
 pub fn getFileIcon(file_type: FileType, extension: []const u8) []const u8 {
     _ = extension; // Will use in full version
