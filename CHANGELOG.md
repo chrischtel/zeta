@@ -1,3 +1,9 @@
+# Zeta 0.1.5
+
+ (Build: 959b54f)
+
+- fixed workflows
+
 # Zeta 0.1.4
 
  (Build: 6a010cd)
@@ -30,6 +36,7 @@
 # Changelog
 
 All notable changes to Zeta will be documented in this file.
+
 
 
 
