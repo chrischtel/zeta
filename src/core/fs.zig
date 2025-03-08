@@ -125,3 +125,81 @@ pub const FileEntry = struct {
         }
     }
 };
+
+
+/// Read all entries in a directory, returning an allocated slice of FileEntries
+pub fn readDirectory(
+    allocator: Allocator, 
+    path: []const u8, 
+    options: struct {
+        include_hidden: bool = false,
+        follow_symlinks: bool = false,
+    },
+) ![]FileEntry {
+    // Handle paths in a cross-platform way
+    const clean_path = try std.fs.path.resolve(allocator, &[_][]const u8{path});
+    defer allocator.free(clean_path);
+    
+    var dir = try fs.openDirAbsolute(clean_path, .{ .iterate = true });
+    defer dir.close();
+    
+    var entries = std.ArrayList(FileEntry).init(allocator);
+    defer {
+        // If we return an error, free any entries we've already created
+        if (@errorReturnTrace()) |_| {
+            for (entries.items) |*entry| {
+                entry.deinit();
+            }
+            entries.deinit();
+        }
+    }
+    
+    var it = dir.iterate();
+    while (try it.next()) |entry| {
+        // Skip hidden files if not requested 
+        // (more comprehensive check happens in the permissions struct)
+        if (!options.include_hidden and entry.name[0] == '.') {
+            continue;
+        }
+        
+        // Handle stat failures gracefully - some files might not be accessible
+        var stat: fs.File.Stat = undefined;
+        stat = dir.statFile(entry.name) catch |err| {
+            // Log the error but continue with other files
+            std.log.warn("Failed to stat {s}: {s}", .{entry.name, @errorName(err)});
+            continue;
+        };
+        
+        // Follow symlinks if requested
+        if (options.follow_symlinks and stat.kind == .SymLink) {
+            // Get the symlink target
+            const target_path = try dir.readLink(entry.name, allocator);
+            defer allocator.free(target_path);
+            
+            // Try to stat the target
+            fs.cwd().statFile(target_path) catch |err| {
+                // If we can't stat the target, keep the original symlink stat
+                std.log.warn("Failed to stat symlink target {s}: {s}", 
+                    .{target_path, @errorName(err)});
+            } |target_stat| {
+                // Use the target's stat data but preserve the fact it's a symlink
+                stat = target_stat;
+                // Keep the symlink type, just update other metadata
+                stat.kind = .SymLink;
+            };
+        }
+        
+        const file_entry = try FileEntry.init(allocator, clean_path, entry.name, stat);
+        try entries.append(file_entry);
+    }
+    
+    return entries.toOwnedSlice();
+}
+
+/// Free an array of FileEntries
+pub fn freeDirectoryEntries(allocator: Allocator, entries: []FileEntry) void {
+    for (entries) |*entry| {
+        entry.deinit();
+    }
+    allocator.free(entries);
+}
