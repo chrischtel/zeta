@@ -1,3 +1,36 @@
+# Zeta 0.1.1
+
+- Basic Functionallity
+- improved file permission handling
+- first prototype
+- Fixed directorys not showing up
+- Fixed time conversion in formatTime
+- changed file icons to ASCII characters for now
+- fixed @divExact(...) error
+- Fixed small errors
+- fixed errors in formatTime fn
+- print version info
+- Added main core library module
+- Added testing module for file system
+- Fixed wrong type error
+- Added formatting module
+- Fixed small syntax errors
+- Implemented Directory Reading Functionallity
+- File Entry Structure (Cross-Platform)
+- changed gitignore
+- removed scripts
+- fix
+- removed generated content from tracking
+- fresh
+- chore: bump version to 0.2.0
+- chore: bump version to 0.1.9
+- chore: bump version to 0.1.9
+- chore: bump version to 0.1.9
+- chore: bump version to 0.1.9
+- chore: bump version to 0.1.9
+- chore: bump version to 0.1.9
+- chore: bump version to 0.1.9
+
 # Zeta 0.2.0
 
 - chore: bump version to 0.1.9
@@ -128,6 +161,7 @@
 # Changelog
 
 All notable changes to Zeta will be documented in this file.
+
 
 
 
