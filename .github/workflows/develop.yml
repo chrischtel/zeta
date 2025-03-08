@@ -1,0 +1,48 @@
+name: Develop Branch Workflow
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  prepare-prerelease:
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+        
+      - name: Determine prerelease type
+        id: prerelease
+        run: |
+          # Default to alpha for develop branch
+          echo "type=alpha" >> $GITHUB_OUTPUT
+      
+      - name: Check if version bump is needed
+        id: check_version
+        shell: pwsh
+        run: |
+          # Run script in dry-run mode
+          $result = ./release.ps1 patch -PreReleaseType ${{ steps.prerelease.outputs.type }} -DryRun
+          if ($LASTEXITCODE -eq 0) {
+            echo "bump=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            echo "bump=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+      
+      - name: Bump version if needed
+        if: ${{ steps.check_version.outputs.bump == 'true' }}
+        shell: pwsh
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          ./release.ps1 patch -PreReleaseType ${{ steps.prerelease.outputs.type }}
+          
+          git push --follow-tags
