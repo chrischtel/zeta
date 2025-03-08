@@ -1,3 +1,13 @@
+# Zeta 0.2.0
+
+- chore: bump version to 0.1.9
+- chore: bump version to 0.1.9
+- chore: bump version to 0.1.9
+- chore: bump version to 0.1.9
+- chore: bump version to 0.1.9
+- chore: bump version to 0.1.9
+- chore: bump version to 0.1.9
+
 # Zeta 0.1.9
 
  (Build: b913464)
@@ -118,6 +128,7 @@
 # Changelog
 
 All notable changes to Zeta will be documented in this file.
+
 
 
 
