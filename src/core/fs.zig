@@ -13,8 +13,10 @@ pub const FileType = enum {
     unknown,
 
     /// Determine file type from stat info with platform-specific handling
-    pub fn fromFileInfo(info: fs.File.Kind) FileType {
-        return switch (info) {
+    pub fn fromFileKind(kind: fs.File.Kind) FileType {
+        std.debug.print("File kind: {any}\n", .{kind});
+
+        return switch (kind) {
             .file => .regular,
             .directory => .directory,
             .sym_link => .symlink,
@@ -98,7 +100,7 @@ pub const FileEntry = struct {
         }
 
         // Get file type
-        const file_type = FileType.fromFileInfo(stat.kind);
+        const file_type = FileType.fromFileKind(stat.kind);
 
         // Get correct size for symlinks if needed
         const size = stat.size;
@@ -130,7 +132,6 @@ pub const FileEntry = struct {
     }
 };
 
-/// Read all entries in a directory, returning an allocated slice of FileEntries
 pub fn readDirectory(
     allocator: Alloc,
     path: []const u8,
@@ -144,7 +145,6 @@ pub fn readDirectory(
 
     var entries = std.ArrayList(FileEntry).init(allocator);
     defer {
-        // If we return an error, free any entries we've already created
         if (@errorReturnTrace()) |_| {
             for (entries.items) |*entry| {
                 entry.deinit();
@@ -156,26 +156,40 @@ pub fn readDirectory(
     var it = dir.iterate();
     while (try it.next()) |entry| {
         // Skip hidden files if not requested
-        if (!options.include_hidden and entry.name[0] == '.') {
+        if (!options.include_hidden and entry.name.len > 0 and entry.name[0] == '.') {
             continue;
         }
 
-        // Get full path for this entry
-        const entry_path = try std.fs.path.join(allocator, &[_][]const u8{ path, entry.name });
-        defer allocator.free(entry_path);
+        // Use entry.kind to determine file type
+        var file_info: fs.File.Stat = undefined;
 
-        // Get file info
-        const file_info = dir.statFile(entry.name) catch |err| {
-            std.log.warn("Failed to stat {s}: {s}", .{ entry.name, @errorName(err) });
-            continue;
-        };
+        // Handle entries based on their type
+        if (entry.kind == .directory) {
+            // For directories, use a different approach
+            var subdir = dir.openDir(entry.name, .{}) catch |err| {
+                std.log.warn("Failed to open directory {s}: {s}", .{ entry.name, @errorName(err) });
+                continue;
+            };
+            defer subdir.close();
+
+            file_info = subdir.stat() catch |err| {
+                std.log.warn("Failed to stat directory {s}: {s}", .{ entry.name, @errorName(err) });
+                continue;
+            };
+        } else {
+            // For regular files and other types, use statFile
+            file_info = dir.statFile(entry.name) catch |err| {
+                std.log.warn("Failed to stat {s}: {s}", .{ entry.name, @errorName(err) });
+                continue;
+            };
+        }
 
         // Create entry
         const file_entry = try FileEntry.init(allocator, path, entry.name, file_info, options.follow_symlinks);
-
         try entries.append(file_entry);
     }
 
+    // Return the entries
     return entries.toOwnedSlice();
 }
 
