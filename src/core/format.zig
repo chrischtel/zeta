@@ -68,7 +68,7 @@ pub fn formatPermissions(allocator: Allocator, perms: FilePermissions, file_type
             result[4] = 'r';
             result[7] = 'r';
         }
-        if (perms.owner_write and !perms.readonly) {
+        if (perms.owner_write and !perms.readable) {
             result[5] = 'w';
             result[8] = 'w';
         }
