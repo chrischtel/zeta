@@ -14,8 +14,6 @@ pub const FileType = enum {
 
     /// Determine file type from stat info with platform-specific handling
     pub fn fromFileKind(kind: fs.File.Kind) FileType {
-        std.debug.print("File kind: {any}\n", .{kind});
-
         return switch (kind) {
             .file => .regular,
             .directory => .directory,
@@ -28,21 +26,59 @@ pub const FileType = enum {
 };
 
 /// Platform-agnostic file permissions
+// Enhanced FilePermissions structure
 pub const FilePermissions = struct {
-    /// Can the file be read
     readable: bool,
-    /// Can the file be written
     writable: bool,
-    /// Can the file be executed
     executable: bool,
-    /// Is this a hidden file
     hidden: bool,
 
-    /// Create from platform-specific info
-    pub fn fromPath(path: []const u8) FilePermissions {
-        const name = std.fs.path.basename(path);
+    // Unix specific (will be false on Windows)
+    owner_read: bool = false,
+    owner_write: bool = false,
+    owner_execute: bool = false,
+    group_read: bool = false,
+    group_write: bool = false,
+    group_execute: bool = false,
+    other_read: bool = false,
+    other_write: bool = false,
+    other_execute: bool = false,
 
-        // Default permissions - would need actual file checks in real implementation
+    // Windows specific
+    system: bool = false,
+    archive: bool = false,
+
+    // Format permissions for display
+    pub fn format(self: FilePermissions, file_type: FileType) []const u8 {
+        // Create a static buffer for the result
+        var buf: [10]u8 = undefined;
+
+        if (builtin.os.tag == .windows) {
+            // Windows-style attributes
+            return std.fmt.bufPrint(&buf, "{c}{c}{c}{c}", .{
+                if (self.readable) 'R' else '-',
+                if (self.writable) 'W' else '-',
+                if (self.hidden) 'H' else '-',
+                if (file_type == .directory) 'D' else '-',
+            }) catch "????";
+        } else {
+            // Unix-style permissions
+            return std.fmt.bufPrint(&buf, "{c}{c}{c}{c}{c}{c}{c}{c}{c}", .{
+                if (self.owner_read) 'r' else '-',
+                if (self.owner_write) 'w' else '-',
+                if (self.owner_execute) 'x' else '-',
+                if (self.group_read) 'r' else '-',
+                if (self.group_write) 'w' else '-',
+                if (self.group_execute) 'x' else '-',
+                if (self.other_read) 'r' else '-',
+                if (self.other_write) 'w' else '-',
+                if (self.other_execute) 'x' else '-',
+            }) catch "---------";
+        }
+    }
+
+    pub fn fromPath(path: []const u8) FilePermissions {
+        // Create default permissions without checking the actual file
         var perms = FilePermissions{
             .readable = true,
             .writable = true,
@@ -50,9 +86,21 @@ pub const FilePermissions = struct {
             .hidden = false,
         };
 
-        // Handle hidden files across platforms
+        // Check if file is hidden based on name
+        const name = std.fs.path.basename(path);
         if (name.len > 0 and name[0] == '.') {
             perms.hidden = true;
+        }
+
+        // For executable files on Windows, check extension
+        if (builtin.os.tag == .windows) {
+            const ext = std.fs.path.extension(path);
+            if (std.mem.eql(u8, ext, ".exe") or
+                std.mem.eql(u8, ext, ".bat") or
+                std.mem.eql(u8, ext, ".cmd"))
+            {
+                perms.executable = true;
+            }
         }
 
         return perms;
@@ -109,13 +157,16 @@ pub const FileEntry = struct {
             // For now we'll just use the link's size
         }
 
+        // Get permissions, handling any errors
+        const permissions = FilePermissions.fromPath(full_path);
+
         return FileEntry{
             .allocator = allocator,
             .path = full_path,
             .name = name_copy,
             .file_type = file_type,
             .size = size,
-            .permissions = FilePermissions.fromPath(full_path),
+            .permissions = permissions,
             .mtime = @intCast(@divFloor(stat.mtime, std.time.ns_per_s)),
             .ctime = @intCast(@divFloor(stat.ctime, std.time.ns_per_s)),
             .extension = extension,
