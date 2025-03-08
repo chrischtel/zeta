@@ -124,7 +124,14 @@ Set-Content -Path "CHANGELOG.md" -Value $newChangelog
 git add build.zig CHANGELOG.md
 git commit -m "chore: bump version to $newVersion"
 
-# Create a tag ALWAYS, using the base version
-git tag -a "v$newVersion" -m "Release v$newVersion"
-Write-Host "Version bumped to $fullVersion and tagged."
+# Create a tag
+if ($isPreRelease) {
+    git tag -a "v$fullVersion" -m "Release v$fullVersion"
+    Write-Host "Prerelease version bumped to $fullVersion and tagged."
+}
+else {
+    git tag -a "v$newVersion" -m "Release v$newVersion"
+    Write-Host "Version bumped to $fullVersion and tagged."
+}
 Write-Host "Run 'git push && git push --tags' to publish the new version."
+
