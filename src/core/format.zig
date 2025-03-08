@@ -131,14 +131,13 @@ pub fn formatTime(allocator: Allocator, timestamp: i128) ![]const u8 {
 pub fn getFileIcon(file_type: FileType, extension: []const u8) []const u8 {
     _ = extension; // Will use in full version
 
-    // Return Unicode characters that work on modern terminals
-    // across platforms
+    // Use simple ASCII characters that work in all terminals
     return switch (file_type) {
-        .directory => "📁",
-        .symlink => "🔗",
-        .regular => "📄",
-        .special => "⚙️",
-        .unknown => "❓",
+        .directory => "[D]",
+        .symlink => "[L]",
+        .regular => "[F]",
+        .special => "[S]",
+        .unknown => "[?]",
     };
 }
 
