@@ -59,15 +59,38 @@ jobs:
         run: zig build build-${{ matrix.platform }} -Doptimize=ReleaseFast
       - name: Package binaries
         run: |
-          mkdir -p dist
-          cp zig-out/bin/${{ matrix.platform }}/* dist/
-          cd dist && tar czf zeta-${{ matrix.platform }}.tar.gz *
-      - name: Upload Release Assets
+            mkdir -p dist
+            
+            # Copy the minimal version
+            cp zig-out/bin/${{ matrix.platform }}/zeta-${{ matrix.platform }} dist/zeta
+            cd dist && tar czf zeta-minimal-${{ matrix.platform }}.tar.gz zeta
+            rm zeta
+            
+            # Copy the full version
+            cp ../zig-out/bin/${{ matrix.platform }}/zetaf-${{ matrix.platform }} dist/zetaf
+            tar czf zeta-full-${{ matrix.platform }}.tar.gz zetaf
+            
+            # Optional combined package
+            cd .. && cp zig-out/bin/${{ matrix.platform }}/* dist/
+            cd dist && tar czf zeta-complete-${{ matrix.platform }}.tar.gz *
+
+      - name: Upload Minimal Release Asset
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./dist/zeta-${{ matrix.platform }}.tar.gz
-          asset_name: zeta-${{ matrix.platform }}.tar.gz
-          asset_content_type: application/gzip
+            upload_url: ${{ needs.create-release.outputs.upload_url }}
+            asset_path: ./dist/zeta-minimal-${{ matrix.platform }}.tar.gz
+            asset_name: zeta-minimal-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz
+            asset_content_type: application/gzip
+
+       - name: Upload Full Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+            upload_url: ${{ needs.create-release.outputs.upload_url }}
+            asset_path: ./dist/zeta-full-${{ matrix.platform }}.tar.gz
+            asset_name: zeta-full-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz
+            asset_content_type: application/gzip
+
