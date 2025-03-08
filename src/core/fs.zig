@@ -49,31 +49,30 @@ pub const FilePermissions = struct {
     archive: bool = false,
 
     // Format permissions for display
+    // Format permissions for display
     pub fn format(self: FilePermissions, file_type: FileType) []const u8 {
         // Create a static buffer for the result
         var buf: [10]u8 = undefined;
 
         if (builtin.os.tag == .windows) {
             // Windows-style attributes
-            return std.fmt.bufPrint(&buf, "{c}{c}{c}{c}", .{
-                if (self.readable) 'R' else '-',
-                if (self.writable) 'W' else '-',
-                if (self.hidden) 'H' else '-',
-                if (file_type == .directory) 'D' else '-',
-            }) catch "????";
+            buf[0] = if (self.readable) @as(u8, 'R') else @as(u8, '-');
+            buf[1] = if (self.writable) @as(u8, 'W') else @as(u8, '-');
+            buf[2] = if (self.hidden) @as(u8, 'H') else @as(u8, '-');
+            buf[3] = if (file_type == .directory) @as(u8, 'D') else @as(u8, '-');
+            return buf[0..4];
         } else {
             // Unix-style permissions
-            return std.fmt.bufPrint(&buf, "{c}{c}{c}{c}{c}{c}{c}{c}{c}", .{
-                if (self.owner_read) 'r' else '-',
-                if (self.owner_write) 'w' else '-',
-                if (self.owner_execute) 'x' else '-',
-                if (self.group_read) 'r' else '-',
-                if (self.group_write) 'w' else '-',
-                if (self.group_execute) 'x' else '-',
-                if (self.other_read) 'r' else '-',
-                if (self.other_write) 'w' else '-',
-                if (self.other_execute) 'x' else '-',
-            }) catch "---------";
+            buf[0] = if (self.owner_read) @as(u8, 'r') else @as(u8, '-');
+            buf[1] = if (self.owner_write) @as(u8, 'w') else @as(u8, '-');
+            buf[2] = if (self.owner_execute) @as(u8, 'x') else @as(u8, '-');
+            buf[3] = if (self.group_read) @as(u8, 'r') else @as(u8, '-');
+            buf[4] = if (self.group_write) @as(u8, 'w') else @as(u8, '-');
+            buf[5] = if (self.group_execute) @as(u8, 'x') else @as(u8, '-');
+            buf[6] = if (self.other_read) @as(u8, 'r') else @as(u8, '-');
+            buf[7] = if (self.other_write) @as(u8, 'w') else @as(u8, '-');
+            buf[8] = if (self.other_execute) @as(u8, 'x') else @as(u8, '-');
+            return buf[0..9];
         }
     }
 
