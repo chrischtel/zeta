@@ -1,5 +1,11 @@
 # Zeta 0.1.1
 
+ (Build: 0249246)
+
+
+
+# Zeta 0.1.1
+
 - Basic Functionallity
 - improved file permission handling
 - first prototype
@@ -161,6 +167,7 @@
 # Changelog
 
 All notable changes to Zeta will be documented in this file.
+
 
 
 
