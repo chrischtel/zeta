@@ -114,8 +114,8 @@ pub const FileEntry = struct {
             .file_type = file_type,
             .size = size,
             .permissions = FilePermissions.fromPath(full_path),
-            .mtime = @intCast(@divExact(stat.mtime, std.time.ns_per_s)),
-            .ctime = @intCast(@divExact(stat.ctime, std.time.ns_per_s)),
+            .mtime = @intCast(@divFloor(stat.mtime, std.time.ns_per_s)),
+            .ctime = @intCast(@divFloor(stat.ctime, std.time.ns_per_s)),
             .extension = extension,
         };
     }
