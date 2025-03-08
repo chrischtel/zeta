@@ -1,5 +1,4 @@
 zig-out
 .zig-cache
 src/generated/version.zig
-*.ps1
-*.sh
+release.ps1
