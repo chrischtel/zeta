@@ -15,7 +15,7 @@ pub const FileType = enum {
     /// Determine file type from stat info with platform-specific handling
     pub fn fromFileInfo(info: fs.File.Stat) FileType {
         return switch (info.kind) {
-            .File => .regular,
+            .file => .regular,
             .Directory => .directory,
             .SymLink => .symlink,
             // Handle all special types generically for cross-platform compatibility
