@@ -46,6 +46,9 @@ jobs:
       - name: Build all platforms
         run: zig build build-all
       
+      - name: List build artifacts
+        run: find zig-out -type f | sort
+      
       - name: Create pre-release artifacts
         run: |
           mkdir -p release
@@ -53,9 +56,16 @@ jobs:
           for platform in linux-x86_64 macos-aarch64 windows-x86_64; do
             mkdir -p "tmp-$platform/bin"
             
-            # Copy both minimal and full executables
-            cp "zig-out/bin/$platform/zeta" "tmp-$platform/bin/"
-            cp "zig-out/bin/$platform/zetaf" "tmp-$platform/bin/"
+            # Copy both minimal and full executables with correct filenames
+            if [[ "$platform" == "windows-x86_64" ]]; then
+              # Handle Windows executables (.exe extension)
+              cp "zig-out/bin/$platform/zeta-$platform.exe" "tmp-$platform/bin/zeta.exe" || echo "Failed to copy zeta-$platform.exe"
+              cp "zig-out/bin/$platform/zetaf-$platform.exe" "tmp-$platform/bin/zetaf.exe" || echo "Failed to copy zetaf-$platform.exe"
+            else
+              # Handle Unix executables
+              cp "zig-out/bin/$platform/zeta-$platform" "tmp-$platform/bin/zeta" || echo "Failed to copy zeta-$platform"
+              cp "zig-out/bin/$platform/zetaf-$platform" "tmp-$platform/bin/zetaf" || echo "Failed to copy zetaf-$platform"
+            fi
             
             # Create a README explaining the versions
             cat > "tmp-$platform/README.txt" << EOF
@@ -72,10 +82,6 @@ jobs:
             
             # Package differently based on platform
             if [[ "$platform" == "windows-x86_64" ]]; then
-              # Add .exe extension for Windows files
-              mv "tmp-$platform/bin/zeta" "tmp-$platform/bin/zeta.exe"
-              mv "tmp-$platform/bin/zetaf" "tmp-$platform/bin/zetaf.exe"
-              
               # Create shortcut batch files
               echo "@echo off" > "tmp-$platform/zeta.bat"
               echo "bin\\zeta.exe %*" >> "tmp-$platform/zeta.bat"
