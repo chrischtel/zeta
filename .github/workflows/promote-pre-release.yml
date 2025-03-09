@@ -28,7 +28,11 @@ jobs:
       
       - name: Run Tests
         run: zig build test
-      
+      - name: Configure Git Identity
+        run: |
+            git config --local user.email "github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            
       - name: Execute Version Bump (Pre-release)
         shell: pwsh
         run: |
