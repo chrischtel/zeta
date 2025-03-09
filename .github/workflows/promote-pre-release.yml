@@ -56,10 +56,8 @@ jobs:
       - name: Extract Version
         id: extract_version
         run: |
-          # Extract the new base version from build.zig (without the git hash).
-          # Example: if build.zig now has: const VERSION = "1.2.3-alpha.2+abcdef", extract "1.2.3-alpha.2"
           $versionLine = Select-String -Path "build.zig" -Pattern 'const VERSION'
-          if ($versionLine -match 'const VERSION = "(.*)\+'){
+          if ($versionLine -match 'const VERSION = "(.*)\+') {
               $version = $Matches[1]
           } else {
               $version = ($versionLine -split '"')[1]
