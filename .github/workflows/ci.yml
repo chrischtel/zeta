@@ -53,10 +53,24 @@ jobs:
           fi
         shell: bash
       
-      - name: Notify status
-        if: always()
+      # Simple status notification without external script
+      - name: Post status comment
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v6
         with:
           script: |
-            const script = require('.github/scripts/notify.js')
-            await script({github, context, core})
+            const outcome = '${{ job.status }}' === 'success' ? '✅ Passed' : '❌ Failed';
+            const ref = context.payload.pull_request.head.sha.substring(0, 7);
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Build Status: ${outcome}
+                
+              Branch type: \`${{ steps.branch-type.outputs.type }}\`
+              Commit: \`${ref}\`
+              
+              [Full build log](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+              `
+            });
