@@ -1,0 +1,83 @@
+name: Promote Pre-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      releaseType:
+        description: "Pre-release type: alpha, beta, rc"
+        required: true
+        default: alpha
+      commitSha:
+        description: "Optional: commit SHA to promote (default: HEAD of develop)"
+        required: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.commitSha || 'develop' }}
+          fetch-depth: 0
+      
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.14.0
+      
+      - name: Run Tests
+        run: zig build test
+      
+      - name: Execute Version Bump (Pre-release)
+        shell: pwsh
+        run: |
+          # Run the release.ps1 script to perform a patch bump with the chosen pre-release type.
+          # This will update build.zig, build.zig.zon, and CHANGELOG.md, then commit and tag.
+          .\release.ps1 patch -PreReleaseType $env:releaseType
+
+  create-release:
+    needs: prepare
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.extract_version.outputs.version }}
+    steps:
+      - name: Checkout for Release
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.commitSha || 'develop' }}
+          fetch-depth: 0
+      
+      - name: Extract Version
+        id: extract_version
+        run: |
+          # Extract the new base version from build.zig (without the git hash).
+          # Example: if build.zig now has: const VERSION = "1.2.3-alpha.2+abcdef", extract "1.2.3-alpha.2"
+          $versionLine = Select-String -Path "build.zig" -Pattern 'const VERSION'
+          if ($versionLine -match 'const VERSION = "(.*)\+'){
+              $version = $Matches[1]
+          } else {
+              $version = ($versionLine -split '"')[1]
+          }
+          Write-Host "version=$version" >> $env:GITHUB_OUTPUT
+      
+      - name: Create Pre-release on GitHub
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: "v${{ steps.extract_version.outputs.version }}"
+          name: "Pre-release: v${{ steps.extract_version.outputs.version }}"
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: true
+
+  build-and-upload:
+    needs: create-release
+    uses: ./.github/workflows/build-and-upload-release.yml
+    with:
+      upload_url: ${{ needs.create-release.outputs.upload_url }}
+      ref_name: "${{ needs.create-release.outputs.version }}"
+    secrets: inherit
