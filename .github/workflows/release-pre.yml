@@ -102,7 +102,7 @@ jobs:
             echo "Creating minimal package..."
             if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
               cp zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN dist/zeta.exe
-              7z a -tzip zeta-minimal-${{ matrix.platform }}.zip dist/zeta.exe
+              7z a -tzip dist/zeta-minimal-${{ matrix.platform }}.zip dist/zeta.exe
               rm dist/zeta.exe
             else
               cp zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN dist/zeta
@@ -118,7 +118,7 @@ jobs:
             echo "Creating full package..."
             if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
               cp zig-out/bin/${{ matrix.platform }}/$FULL_BIN dist/zetaf.exe
-              7z a -tzip zeta-full-${{ matrix.platform }}.zip dist/zetaf.exe
+              7z a -tzip dist/zeta-full-${{ matrix.platform }}.zip dist/zetaf.exe
               rm dist/zetaf.exe
             else
               cp zig-out/bin/${{ matrix.platform }}/$FULL_BIN dist/zetaf
@@ -136,7 +136,7 @@ jobs:
           if [ "$(ls -A dist)" ]; then
             # Windows should zip here
             if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-              7z a -tzip zeta-complete-${{ matrix.platform }}.zip dist/*
+              7z a -tzip dist/zeta-complete-${{ matrix.platform }}.zip dist/*
             else
               tar czf dist/zeta-complete-${{ matrix.platform }}.tar.gz dist/*
             fi
