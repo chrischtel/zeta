@@ -37,7 +37,7 @@ pub fn formatPermissions(allocator: Allocator, perms: FilePermissions, file_type
         if (perms.readable) attrs[0] = 'R';
         if (perms.hidden) attrs[1] = 'H';
 
-        // Show directory/archive attribute
+        // Show directory/archive attribute /
         if (file_type == .directory) {
             attrs[3] = 'D';
         } else if (file_type == .symlink) {
