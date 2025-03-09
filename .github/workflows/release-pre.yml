@@ -80,9 +80,14 @@ jobs:
           echo "Checking build output structure:"
           find zig-out -type f -name "*" | sort
           
-          # Default filename patterns - modify if needed
-          MINIMAL_BIN="zeta-${{ matrix.platform }}"
-          FULL_BIN="zetaf-${{ matrix.platform }}"
+          # Define binary names with .exe for Windows
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            MINIMAL_BIN="zeta-${{ matrix.platform }}.exe"
+            FULL_BIN="zetaf-${{ matrix.platform }}.exe"
+          else
+            MINIMAL_BIN="zeta-${{ matrix.platform }}"
+            FULL_BIN="zetaf-${{ matrix.platform }}"
+          fi
           
           # Try to find binaries with more flexible patterns if exact match fails
           if [ ! -f "zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN" ]; then
@@ -108,10 +113,9 @@ jobs:
           # Create minimal package if binary exists
           if [ -n "$MINIMAL_BIN" ] && [ -f "zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN" ]; then
             echo "Creating minimal package..."
-            cp zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN dist/zeta
-            cd dist && tar czf zeta-minimal-${{ matrix.platform }}.tar.gz zeta
-            rm zeta
-            cd ..
+            cp zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN dist/zeta.exe
+            cd dist && zip -r zeta-minimal-${{ matrix.platform }}.zip zeta.exe && cd ..
+            rm dist/zeta.exe
           else
             echo "Skipping minimal package creation"
           fi
@@ -119,10 +123,9 @@ jobs:
           # Create full package if binary exists
           if [ -n "$FULL_BIN" ] && [ -f "zig-out/bin/${{ matrix.platform }}/$FULL_BIN" ]; then
             echo "Creating full package..."
-            cp zig-out/bin/${{ matrix.platform }}/$FULL_BIN dist/zetaf
-            cd dist && tar czf zeta-full-${{ matrix.platform }}.tar.gz zetaf
-            rm zetaf
-            cd ..
+            cp zig-out/bin/${{ matrix.platform }}/$FULL_BIN dist/zetaf.exe
+            cd dist && zip -r zeta-full-${{ matrix.platform }}.zip zetaf.exe && cd ..
+            rm dist/zetaf.exe
           else
             echo "Skipping full package creation"
           fi
@@ -132,7 +135,12 @@ jobs:
           find zig-out/bin/${{ matrix.platform }} -type f -exec cp {} dist/ \; || echo "No binaries found to copy"
           ls -la dist/
           if [ "$(ls -A dist)" ]; then
-            cd dist && tar czf zeta-complete-${{ matrix.platform }}.tar.gz * && cd ..
+            # Windows should zip here
+            if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+              cd dist && zip -r zeta-complete-${{ matrix.platform }}.zip * && cd ..
+            else
+              cd dist && tar czf zeta-complete-${{ matrix.platform }}.tar.gz * && cd ..
+            fi
           else
             echo "No files available for complete package"
             exit 1

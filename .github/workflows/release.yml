@@ -74,19 +74,76 @@ jobs:
         run: |
           mkdir -p dist
           
-          # Copy the minimal version
-          cp zig-out/bin/${{ matrix.platform }}/zeta-${{ matrix.platform }} dist/zeta
-          cd dist && tar czf zeta-minimal-${{ matrix.platform }}.tar.gz zeta
-          rm zeta
+          # Check build directory structure
+          echo "Checking build output structure:"
+          find zig-out -type f -name "*" | sort
           
-          # Copy the full version
-          cp ../zig-out/bin/${{ matrix.platform }}/zetaf-${{ matrix.platform }} dist/zetaf
-          tar czf zeta-full-${{ matrix.platform }}.tar.gz zetaf
+          # Define binary names with .exe for Windows
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            MINIMAL_BIN="zeta-${{ matrix.platform }}.exe"
+            FULL_BIN="zetaf-${{ matrix.platform }}.exe"
+          else
+            MINIMAL_BIN="zeta-${{ matrix.platform }}"
+            FULL_BIN="zetaf-${{ matrix.platform }}"
+          fi
           
-          # Optional combined package
-          cd .. && cp zig-out/bin/${{ matrix.platform }}/* dist/
-          cd dist && tar czf zeta-complete-${{ matrix.platform }}.tar.gz *
-
+          # Try to find binaries with more flexible patterns if exact match fails
+          if [ ! -f "zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN" ]; then
+            echo "Couldn't find expected minimal binary, searching for alternatives..."
+            MINIMAL_BIN=$(find zig-out -type f -name "zeta*" | grep -v "zetaf" | head -1 | xargs basename || echo "")
+            if [ -n "$MINIMAL_BIN" ]; then
+              echo "Found alternative minimal binary: $MINIMAL_BIN"
+            else
+              echo "No minimal binary found, skipping minimal package"
+            fi
+          fi
+          
+          if [ ! -f "zig-out/bin/${{ matrix.platform }}/$FULL_BIN" ]; then
+            echo "Couldn't find expected full binary, searching for alternatives..."
+            FULL_BIN=$(find zig-out -type f -name "zetaf*" | head -1 | xargs basename || echo "")
+            if [ -n "$FULL_BIN" ]; then
+              echo "Found alternative full binary: $FULL_BIN" 
+            else
+              echo "No full binary found, skipping full package"
+            fi
+          fi
+          
+          # Create minimal package if binary exists
+          if [ -n "$MINIMAL_BIN" ] && [ -f "zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN" ]; then
+            echo "Creating minimal package..."
+            cp zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN dist/zeta.exe
+            cd dist && zip -r zeta-minimal-${{ matrix.platform }}.zip zeta.exe && cd ..
+            rm dist/zeta.exe
+          else
+            echo "Skipping minimal package creation"
+          fi
+          
+          # Create full package if binary exists
+          if [ -n "$FULL_BIN" ] && [ -f "zig-out/bin/${{ matrix.platform }}/$FULL_BIN" ]; then
+            echo "Creating full package..."
+            cp zig-out/bin/${{ matrix.platform }}/$FULL_BIN dist/zetaf.exe
+            cd dist && zip -r zeta-full-${{ matrix.platform }}.zip zetaf.exe && cd ..
+            rm dist/zetaf.exe
+          else
+            echo "Skipping full package creation"
+          fi
+          
+          # Create complete package with all binaries
+          echo "Creating complete package with all available binaries..."
+          find zig-out/bin/${{ matrix.platform }} -type f -exec cp {} dist/ \; || echo "No binaries found to copy"
+          ls -la dist/
+          if [ "$(ls -A dist)" ]; then
+            # Windows should zip here
+            if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+              cd dist && zip -r zeta-complete-${{ matrix.platform }}.zip * && cd ..
+            else
+              cd dist && tar czf zeta-complete-${{ matrix.platform }}.tar.gz * && cd ..
+            fi
+          else
+            echo "No files available for complete package"
+            exit 1
+          fi
+      
       - name: Upload Minimal Release Asset
         uses: actions/upload-release-asset@v1
         env:
