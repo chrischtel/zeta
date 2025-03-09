@@ -71,23 +71,48 @@ jobs:
         id: extract_version
         shell: pwsh
         run: |
-          $versionLine = Select-String -Path "build.zig" -Pattern 'const VERSION'
-          if ($versionLine -match 'const VERSION = "(.*?)"') {
-            $version = $Matches[1]
-            if ($version -match '-') {
-              echo "is_prerelease=true" >> $env:GITHUB_OUTPUT
-              if ($version -match '\+') {
-                $cleanVersion = $version -replace '\+.*', ''
-                echo "version=$cleanVersion" >> $env:GITHUB_OUTPUT
+          # First check if the file exists and output its contents for debugging
+          if (Test-Path "build.zig") {
+            Write-Host "Contents of build.zig:"
+            Get-Content "build.zig" | Select -First 10
+          } else {
+            Write-Host "build.zig file not found!"
+            exit 1
+          }
+          
+          # Try to find the version with a more flexible pattern
+          $versionLine = Select-String -Path "build.zig" -Pattern 'VERSION'
+          
+          if ($null -ne $versionLine) {
+            Write-Host "Found version line: $($versionLine.Line)"
+            
+            # Try different patterns that might match your version format
+            if ($versionLine.Line -match 'VERSION\s*=\s*"([^"]*)"') {
+              $version = $Matches[1]
+              Write-Host "Extracted version: $version"
+              
+              if ($version -match '-') {
+                echo "is_prerelease=true" >> $env:GITHUB_OUTPUT
+                if ($version -match '\+') {
+                  $cleanVersion = $version -replace '\+.*', ''
+                  echo "version=$cleanVersion" >> $env:GITHUB_OUTPUT
+                } else {
+                  echo "version=$version" >> $env:GITHUB_OUTPUT
+                }
               } else {
+                echo "is_prerelease=false" >> $env:GITHUB_OUTPUT
                 echo "version=$version" >> $env:GITHUB_OUTPUT
               }
             } else {
-              echo "is_prerelease=false" >> $env:GITHUB_OUTPUT
-              echo "version=$version" >> $env:GITHUB_OUTPUT
+              Write-Host "Version line found but couldn't extract version with regex"
+              Write-Host "Line content: $($versionLine.Line)"
+              exit 1
             }
+          } else {
+            Write-Host "No VERSION pattern found in build.zig!"
+            exit 1
           }
-      
+            
       - name: Push Changes and Tags
         run: |
           git push
