@@ -296,12 +296,41 @@ if ($changes.Count -eq 0) {
 
 $changelogText = $changelogHeader + ($changes -join "`n") + "`n`n"
 
+# Add this to your script, replacing the existing changelog code
 if (Test-Path "CHANGELOG.md") {
+    # Extract title and header
+    $title = "# Changelog"
+    
+    # Extract existing release entries (each starts with "# X.X.X")
+    $pattern = "(?s)# \d+\.\d+\.\d+.*?(?=# \d+\.\d+\.\d+|$)"
     $existingChangelog = Get-Content -Path "CHANGELOG.md" -Raw
-    $newChangelog = $changelogText + $existingChangelog
+    $entries = [regex]::Matches($existingChangelog, $pattern)
+    
+    # Keep only the 7 most recent entries (adjust as needed)
+    $maxEntries = 7
+    $recentEntries = @()
+    $count = 0
+    
+    foreach ($entry in $entries) {
+        if ($count -lt $maxEntries - 1) {
+            # -1 to account for the new entry
+            $recentEntries += $entry.Value
+        }
+        $count++
+        if ($count -ge $maxEntries - 1) {
+            break
+        }
+    }
+    
+    # Add a note about older releases
+    $footer = "`n## Older Releases\n\nFor older releases, please see the [GitHub Releases page](https://github.com/YOUR_USERNAME/zeta/releases).\n"
+    
+    # Combine everything
+    $joinedEntries = $recentEntries -join ""
+    $newChangelog = "$title`n`n$changelogText$joinedEntries$footer"
 }
 else {
-    $newChangelog = "# Changelog`n`n" + $changelogText
+    $newChangelog = "# Changelog`n`n$changelogText"
 }
 
 Set-Content -Path "CHANGELOG.md" -Value $newChangelog -NoNewline
