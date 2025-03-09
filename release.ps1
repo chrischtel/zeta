@@ -40,6 +40,57 @@ function Write-Status {
     Write-Host "$Message"
 }
 
+function Get-MeaningfulChanges {
+    param (
+        [string[]]$CommitMessages
+    )
+    
+    $features = @()
+    $fixes = @()
+    $other = @()
+    
+    foreach ($msg in $CommitMessages) {
+        # Only include conventionally formatted commits
+        if ($msg -match '^\- (feat|fix|perf|refactor|hotfix):') {
+            # Categorize changes
+            if ($msg -match '^\- (fix|hotfix):') {
+                $fixes += $msg
+            }
+            elseif ($msg -match '^\- feat:') {
+                $features += $msg
+            }
+            else {
+                $other += $msg
+            }
+        }
+    }
+    
+    $result = @()
+    
+    if ($features.Count -gt 0) {
+        $result += "### New Features"
+        $result += ""
+        $result += $features
+        $result += ""
+    }
+    
+    if ($fixes.Count -gt 0) {
+        $result += "### Bug Fixes"
+        $result += ""
+        $result += $fixes
+        $result += ""
+    }
+    
+    if ($other.Count -gt 0) {
+        $result += "### Other Improvements"
+        $result += ""
+        $result += $other
+        $result += ""
+    }
+    
+    return $result
+}
+
 # Validate inputs and parameters
 if ($VersionType -notin @("major", "minor", "patch", "promote", "hotfix", "none")) {
     Write-Status "Invalid version type. Use major, minor, patch, promote, hotfix, or none." "error"
@@ -229,15 +280,18 @@ elseif ($Hotfix) {
 }
 $changelogHeader += "`n`nReleased on $(Get-Date -Format "yyyy-MM-dd")`n`n"
 
+# Get conventional commits from git log
 if ($lastTag) {
-    $changes = git log --pretty=format:"- %s" "$lastTag..HEAD" | Where-Object { $_ -notmatch '^chore:' }
+    $rawChanges = git log --pretty=format:"- %s" "$lastTag..HEAD"
 }
 else {
-    $changes = git log --pretty=format:"- %s" | Where-Object { $_ -notmatch '^chore:' }
+    $rawChanges = git log --pretty=format:"- %s"
 }
 
-if (-not $changes) {
-    $changes = @("- No significant changes")
+# Filter to only include meaningful changes
+$changes = Get-MeaningfulChanges -CommitMessages $rawChanges
+if ($changes.Count -eq 0) {
+    $changes = @("- No significant changes in this release")
 }
 
 $changelogText = $changelogHeader + ($changes -join "`n") + "`n`n"
