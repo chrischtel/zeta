@@ -54,6 +54,7 @@ jobs:
           fetch-depth: 0
       
       - name: Extract Version
+        shell: pwsh
         id: extract_version
         run: |
           $versionLine = Select-String -Path "build.zig" -Pattern 'const VERSION'
