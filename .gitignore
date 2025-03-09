@@ -1,4 +1,3 @@
 zig-out
 .zig-cache
 src/generated/version.zig
-release.ps1
