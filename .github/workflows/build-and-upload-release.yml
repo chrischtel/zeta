@@ -13,12 +13,15 @@ on:
 jobs:
   build_and_upload:
     strategy:
+      fail-fast: false  # Don't fail all builds if one fails
       matrix:
         include:
           - os: ubuntu-latest
             platform: linux-x86_64
           - os: macos-latest
             platform: macos-aarch64
+          - os: macos-latest
+            platform: macos-x86_64
           - os: windows-latest
             platform: windows-x86_64
     runs-on: ${{ matrix.os }}
@@ -39,98 +42,61 @@ jobs:
       
       - name: Build
         run: zig build build-${{ matrix.platform }} -Doptimize=ReleaseFast
-      
-      - name: Package binaries
+        
+      - name: Verify Build Output
         shell: bash
         run: |
-          mkdir -p dist
-          echo "Checking build output structure:"
-          find zig-out/bin -type f -name "*" | sort
-
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            MINIMAL_BIN="zeta-${{ matrix.platform }}.exe"
-            FULL_BIN="zetaf-${{ matrix.platform }}.exe"
-          else
-            MINIMAL_BIN="zeta-${{ matrix.platform }}"
-            FULL_BIN="zetaf-${{ matrix.platform }}"
+          if [ ! -d "zig-out/bin/${{ matrix.platform }}" ]; then
+            echo "Build output directory not found! Expected: zig-out/bin/${{ matrix.platform }}"
+            find zig-out -type d | sort
+            exit 1
           fi
-
-          # Create minimal package if binary exists
-          if [ -f "zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN" ]; then
-            echo "Creating minimal package..."
-            if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-              cp zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN dist/zeta.exe
-              7z a -tzip dist/zeta-minimal-${{ matrix.platform }}.zip dist/zeta.exe
-              rm dist/zeta.exe
-            else
-              cp zig-out/bin/${{ matrix.platform }}/$MINIMAL_BIN dist/zeta
-              tar czf dist/zeta-minimal-${{ matrix.platform }}.tar.gz -C dist zeta
-              rm dist/zeta
-            fi
-          else
-            echo "Skipping minimal package creation"
-          fi
-
-          # Create full package if binary exists
-          if [ -f "zig-out/bin/${{ matrix.platform }}/$FULL_BIN" ]; then
-            echo "Creating full package..."
-            if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-              cp zig-out/bin/${{ matrix.platform }}/$FULL_BIN dist/zetaf.exe
-              7z a -tzip dist/zeta-full-${{ matrix.platform }}.zip dist/zetaf.exe
-              rm dist/zetaf.exe
-            else
-              cp zig-out/bin/${{ matrix.platform }}/$FULL_BIN dist/zetaf
-              tar czf dist/zeta-full-${{ matrix.platform }}.tar.gz -C dist zetaf
-              rm dist/zetaf
-            fi
-          else
-            echo "Skipping full package creation"
-          fi
-
-          # Create complete package with all available binaries
-          echo "Creating complete package with all available binaries..."
-          cp -r zig-out/bin/${{ matrix.platform }}/* dist/ || echo "No binaries found"
-          ls -la dist/
-          if [ "$(ls -A dist)" ]; then
-            if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-              7z a -tzip dist/zeta-complete-${{ matrix.platform }}.zip dist/*
-            else
-              tar czf dist/zeta-complete-${{ matrix.platform }}.tar.gz -C dist .
-            fi
-          else
-            echo "No files available for complete package"
+          
+          echo "Build output contents:"
+          find zig-out/bin/${{ matrix.platform }} -type f | sort
+          
+          if [ -z "$(find zig-out/bin/${{ matrix.platform }} -type f -name "*")" ]; then
+            echo "No build outputs found!"
             exit 1
           fi
       
-      - name: Upload Minimal Release Asset
-        uses: actions/upload-release-asset@v1
-        if: hashFiles('./dist/zeta-minimal-${{ matrix.platform }}.${{ runner.os == 'Windows' && 'zip' || 'tar.gz' }}') != ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ inputs.upload_url }}
-          asset_path: ./dist/zeta-minimal-${{ matrix.platform }}.${{ (matrix.os == 'windows-latest') && 'zip' || 'tar.gz' }}
-          asset_name: zeta-minimal-${{ inputs.ref_name }}-${{ matrix.platform }}.${{ (matrix.os == 'windows-latest') && 'zip' || 'tar.gz' }}
-          asset_content_type: application/${{ (matrix.os == 'windows-latest') && 'zip' || 'gzip' }}
+      - name: Package binaries
+        id: package
+        shell: bash
+        run: |
+          mkdir -p dist
+          
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            EXT=".exe"
+            ARCHIVE_EXT=".zip"
+            ARCHIVE_CMD="7z a -tzip"
+            CONTENT_TYPE="application/zip"
+          else
+            EXT=""
+            ARCHIVE_EXT=".tar.gz"
+            ARCHIVE_CMD="tar czf"
+            CONTENT_TYPE="application/gzip"
+          fi
+          
+          # Copy all binaries to dist with correct extension
+          mkdir -p dist/bin
+          find zig-out/bin/${{ matrix.platform }} -type f -executable -exec cp {} dist/bin/ \;
+          
+          # Create complete package
+          cd dist
+          $ARCHIVE_CMD zeta-${{ matrix.platform }}$ARCHIVE_EXT bin
+          cd ..
+          
+          echo "archive_path=dist/zeta-${{ matrix.platform }}$ARCHIVE_EXT" >> $GITHUB_OUTPUT
+          echo "archive_name=zeta-${{ inputs.ref_name }}-${{ matrix.platform }}$ARCHIVE_EXT" >> $GITHUB_OUTPUT
+          echo "content_type=$CONTENT_TYPE" >> $GITHUB_OUTPUT
       
-      - name: Upload Full Release Asset
+      - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
-        if: hashFiles('./dist/zeta-full-${{ matrix.platform }}.${{ runner.os == 'Windows' && 'zip' || 'tar.gz' }}') != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ inputs.upload_url }}
-          asset_path: ./dist/zeta-full-${{ matrix.platform }}.${{ (matrix.os == 'windows-latest') && 'zip' || 'tar.gz' }}
-          asset_name: zeta-full-${{ inputs.ref_name }}-${{ matrix.platform }}.${{ (matrix.os == 'windows-latest') && 'zip' || 'tar.gz' }}
-          asset_content_type: application/${{ (matrix.os == 'windows-latest') && 'zip' || 'gzip' }}
-      
-      - name: Upload Complete Release Asset
-        uses: actions/upload-release-asset@v1
-        if: hashFiles('./dist/zeta-complete-${{ matrix.platform }}.${{ runner.os == 'Windows' && 'zip' || 'tar.gz' }}') != ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ inputs.upload_url }}
-          asset_path: ./dist/zeta-complete-${{ matrix.platform }}.${{ (matrix.os == 'windows-latest') && 'zip' || 'tar.gz' }}
-          asset_name: zeta-complete-${{ inputs.ref_name }}-${{ matrix.platform }}.${{ (matrix.os == 'windows-latest') && 'zip' || 'tar.gz' }}
-          asset_content_type: application/${{ (matrix.os == 'windows-latest') && 'zip' || 'gzip' }}
+          asset_path: ${{ steps.package.outputs.archive_path || format('./dist/zeta-{0}{1}', matrix.platform, runner.os == 'Windows' && '.zip' || '.tar.gz') }}
+          asset_name: ${{ steps.package.outputs.archive_name || format('zeta-{0}-{1}{2}', inputs.ref_name, matrix.platform, runner.os == 'Windows' && '.zip' || '.tar.gz') }}
+          asset_content_type: ${{ steps.package.outputs.content_type || (runner.os == 'Windows' && 'application/zip' || 'application/gzip') }}

@@ -1,7 +1,8 @@
 # release.ps1 - Version bumping for Zeta project
 # Usage:
 #   .\release.ps1 [major|minor|patch]
-#   .\release.ps1 [major|minor|patch] -PreReleaseType alpha -PreReleaseVersion 1
+#   .\release.ps1 [major|minor|patch] -PreReleaseType alpha
+#   .\release.ps1 promote -FromPreRelease  # Promotes current pre-release to full release
 
 param(
     [Parameter(Position = 0)]
@@ -11,12 +12,21 @@ param(
     [string]$PreReleaseType = "",
 
     [Parameter()]
-    [string]$PreReleaseVersion = ""
+    [switch]$FromPreRelease = $false,
+
+    [Parameter()]
+    [switch]$DryRun = $false
 )
 
 # Validate version type
-if ($VersionType -notin @("major", "minor", "patch", "none")) {
-    Write-Error "Invalid version type. Use major, minor, patch, or none."
+if ($VersionType -notin @("major", "minor", "patch", "none", "promote")) {
+    Write-Error "Invalid version type. Use major, minor, patch, none, or promote."
+    exit 1
+}
+
+# Validate promotion parameters
+if ($VersionType -eq "promote" -and -not $FromPreRelease) {
+    Write-Error "Promotion requires -FromPreRelease switch"
     exit 1
 }
 
@@ -27,10 +37,6 @@ if ($PreReleaseType -ne "") {
     if ($PreReleaseType -notin @("alpha", "beta", "rc")) {
         Write-Warning "Unusual prerelease type: $PreReleaseType. Common types are alpha, beta, rc."
     }
-
-    #if ($PreReleaseVersion -eq "") { #No longer needed because we increment it in the script now
-    #    $PreReleaseVersion = "1" # Default to 1 if not specified
-    #}
 }
 
 # Get current git hash
@@ -46,97 +52,100 @@ if (-not $currentVersion) {
     exit 1
 }
 
-# Strip any existing prerelease/build info
-$baseVersion = $currentVersion -replace '-.*', ''
+Write-Host "Current version: $currentVersion"
 
-# Split version into components
-$versionParts = $baseVersion.Split('.')
-$major = [int]$versionParts[0]
-$minor = [int]$versionParts[1]
-$patch = [int]$versionParts[2]
-
-# *Conditional* Increment of Version based on type - Only if NOT a prerelease
-if (-not $isPreRelease) {
-    switch ($VersionType) {
-        "none" {
-            # Don't change version numbers, just remove prerelease info
-        }
-        "major" {
-            $major++
-            $minor = 0
-            $patch = 0
-        }
-        "minor" {
-            $minor++
-            $patch = 0
-        }
-        "patch" {
-            $patch++
-        }
+# Handle promotion from pre-release to full release
+if ($VersionType -eq "promote" -and $FromPreRelease) {
+    if (-not ($currentVersion -match "^(\d+\.\d+\.\d+)-(.+)(\+.+)?$")) {
+        Write-Error "Current version '$currentVersion' is not a pre-release version"
+        exit 1
     }
-}
-
-# Create new version string - the BASE version
-$newVersion = "$major.$minor.$patch"
-
-# Handle Pre-release versioning
-if ($isPreRelease) {
-    # Strip the git hash BEFORE matching
-    $currentVersionWithoutHash = $currentVersion -replace '\+.*', ''
-
-    Write-Host "CurrentVersion: $($currentVersion)"
-    Write-Host "CurrentVersionWithoutHash: $($currentVersionWithoutHash)" #Debug statement
-    Write-Host "BaseVersion: $($baseVersion)"
-    Write-Host "PreReleaseType: $($PreReleaseType)"
-    Write-Host "IsPreRelease: $($isPreRelease)"  # <--- Add this line
-    #Check if there is a prerelease number
-    if ($currentVersionWithoutHash -match "-$PreReleaseType\.(\d+)$") {
-        Write-Host "Regex MATCHED!"
-        #Get the current prerelease version
-        $currentPreReleaseVersion = [int]$Matches[1]
-        Write-Host "Matches[1]: $($Matches[1])"
-
-        #Increment it
-        $PreReleaseVersion = $currentPreReleaseVersion + 1
-        Write-Host "Incrementing existing $PreReleaseType version to $PreReleaseVersion"
-        $fullVersion = "$newVersion-$PreReleaseType.$PreReleaseVersion+$gitHash"
-    }
-    else {
-        Write-Host "Regex DID NOT MATCH!"
-        #No existing prerelease number, so use 1
-        $PreReleaseVersion = 1
-        Write-Host "Setting $PreReleaseType version to $PreReleaseVersion"
-        $fullVersion = "$newVersion-$PreReleaseType.$PreReleaseVersion+$gitHash"
-    }
+    
+    $newVersion = $Matches[1]
+    Write-Host "Promoting pre-release $currentVersion to full release $newVersion"
+    $fullVersion = $newVersion
+    
+    # Update files and create commits/tags below
 }
 else {
-    $fullVersion = $newVersion # No Git hash for official releases
+    # Strip any existing prerelease/build info for normal versioning
+    $baseVersion = $currentVersion -replace '-.*', ''
+
+    # Split version into components
+    $versionParts = $baseVersion.Split('.')
+    $major = [int]$versionParts[0]
+    $minor = [int]$versionParts[1]
+    $patch = [int]$versionParts[2]
+
+    # Increment Version based on type - Only if NOT a prerelease
+    if ($VersionType -ne "none") {
+        switch ($VersionType) {
+            "major" {
+                $major++
+                $minor = 0
+                $patch = 0
+            }
+            "minor" {
+                $minor++
+                $patch = 0
+            }
+            "patch" {
+                $patch++
+            }
+        }
+    }
+
+    # Create new version string - the BASE version
+    $newVersion = "$major.$minor.$patch"
+
+    # Handle Pre-release versioning
+    if ($isPreRelease) {
+        # Strip the git hash BEFORE matching
+        $currentVersionWithoutHash = $currentVersion -replace '\+.*', ''
+
+        Write-Host "Base version: $baseVersion"
+        
+        #Check if there is a prerelease number
+        if ($currentVersionWithoutHash -match "-$PreReleaseType\.(\d+)$") {
+            #Get the current prerelease version
+            $currentPreReleaseVersion = [int]$Matches[1]
+            
+            #Increment it
+            $nextPreReleaseVersion = $currentPreReleaseVersion + 1
+            Write-Host "Incrementing existing $PreReleaseType version to $nextPreReleaseVersion"
+            $fullVersion = "$newVersion-$PreReleaseType.$nextPreReleaseVersion+$gitHash"
+        }
+        else {
+            #No existing prerelease number, so use 1
+            $nextPreReleaseVersion = 1
+            Write-Host "Setting $PreReleaseType version to $nextPreReleaseVersion"
+            $fullVersion = "$newVersion-$PreReleaseType.$nextPreReleaseVersion+$gitHash"
+        }
+    }
+    else {
+        $fullVersion = $newVersion # No Git hash for official releases
+    }
 }
 
-# *** INSERT THE NEW CODE HERE ***
-# Construct the version pattern for build.zig.zon
-$versionZonPattern = '\.version = "([\d\.]+[^"]*)"'
+Write-Host "New version: $fullVersion"
 
-# Construct the replacement version string for build.zig.zon
-$replacementZonVersion = ".version = `"$newVersion`""
-
-# Get content of build.zig.zon
-$buildZonContent = Get-Content -Path "build.zig.zon" -Raw
-
-# Replace with the new version
-$buildZonUpdatedContent = $buildZonContent -replace $versionZonPattern, $replacementZonVersion
-
-# Save updated content
-Set-Content -Path "build.zig.zon" -Value $buildZonUpdatedContent
-# *** END OF INSERTED CODE ***
-
-Write-Host "Bumping version: $currentVersion → $fullVersion"
+if ($DryRun) {
+    Write-Host "DRY RUN: Would update files with version $fullVersion"
+    exit 0
+}
 
 # Update version in build.zig
 $updatedContent = $buildContent -replace $versionPattern, "const VERSION = `"$fullVersion`""
 Set-Content -Path "build.zig" -Value $updatedContent
 
-# Get most recent tag
+# Update version in build.zig.zon
+$versionZonPattern = '\.version = "([\d\.]+[^"]*)"'
+$buildZonContent = Get-Content -Path "build.zig.zon" -Raw
+$replacementZonVersion = ".version = `"$newVersion`""
+$buildZonUpdatedContent = $buildZonContent -replace $versionZonPattern, $replacementZonVersion
+Set-Content -Path "build.zig.zon" -Value $buildZonUpdatedContent
+
+# Get most recent tag for changelog
 try {
     $lastTag = git describe --tags --abbrev=0
 }
@@ -154,7 +163,7 @@ else {
     $changes = git log --pretty=format:"- %s"
 }
 
-# Append Git hash to the changelog entry IFF it's a pre-release
+# Append Git hash to the changelog entry for pre-releases
 if ($isPreRelease) {
     $changelogHeader = "$changelogHeader (Build: $gitHash)`n`n"
 }
@@ -170,7 +179,7 @@ Set-Content -Path "CHANGELOG.md" -Value $newChangelog
 
 # Commit changes
 git add build.zig build.zig.zon CHANGELOG.md
-git commit -m "chore: bump version to $newVersion"
+git commit -m "chore: bump version to $fullVersion"
 
 # Create a tag
 if ($isPreRelease) {
@@ -181,4 +190,6 @@ else {
     git tag -a "v$newVersion" -m "Release v$newVersion"
     Write-Host "Version bumped to $fullVersion and tagged."
 }
+
 Write-Host "Run 'git push && git push --tags' to publish the new version."
+Write-Host "Or use the GitHub Actions workflow to automate the release process."

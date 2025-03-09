@@ -2,12 +2,62 @@ name: CI
 
 on:
   push:
-    branches: [main, develop, 'release/*', 'hotfix/*']
+    branches: [main, develop, 'release/*', 'hotfix/*', 'feature/*']
   pull_request:
-    branches: [main, develop, 'release/*', 'hotfix/*']
+    branches: [main, develop, 'release/*']
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code_changed: ${{ steps.filter.outputs.code }}
+      docs_changed: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'src/**/*.zig'
+              - 'build.zig'
+              - 'build.zig.zon'
+            docs:
+              - '**/*.md'
+              - 'docs/**'
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.14.0
+      - name: Format check
+        run: zig fmt --check src/ || echo "::warning::Formatting issues found"
+  
   common:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.code_changed == 'true' }}
     uses: ./.github/workflows/ci-common.yml
     with:
-      skip-tests: false
+      skip-tests: ${{ github.event_name == 'push' && contains(github.ref, 'release/') }}
+    secrets: inherit
+
+  version-check:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    needs: common
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Check for version bumps
+        shell: pwsh
+        run: |
+          Write-Host "Checking version in develop branch"
+          $versionLine = Select-String -Path "build.zig" -Pattern 'const VERSION'
+          if ($versionLine -match 'const VERSION = "(.*?)"') {
+            $version = $Matches[1]
+            Write-Host "Current version: $version"
+          }

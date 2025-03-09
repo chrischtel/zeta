@@ -42,6 +42,8 @@ jobs:
         with:
           version: 0.14.0
       - name: Format code
-        run: zig fmt src/generated/version.zig || true
-      - name: Lint code
-        run: zig fmt --check src/ || echo "Formatting issues found"
+        run: zig fmt src/ || echo "::warning::Zig format issues detected"
+      - name: Check for common issues
+        run: |
+          echo "Running additional checks..."
+          # Add your custom lint checks here
