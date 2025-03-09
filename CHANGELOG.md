@@ -1,3 +1,9 @@
+# 0.0.0-alpha.2+3b333b2 (alpha)
+
+Released on 2025-03-09
+
+- fixed regex
+
 # 0.0.0-alpha.1+dcd27cd (alpha)
 
 Released on 2025-03-09
