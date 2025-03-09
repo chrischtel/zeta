@@ -1,9 +1,9 @@
 # release.ps1 - Version management for Zeta project
 # Usage:
-#   ./release.ps1 [major|minor|patch]           # Standard release
-#   ./release.ps1 [major|minor|patch] -pre alpha # Pre-release (alpha, beta, rc)
+#   ./release.ps1 [major|minor|patch|none]           # Standard release (none = keep version)
+#   ./release.ps1 [major|minor|patch|none] -pre alpha # Pre-release (alpha, beta, rc)
 #   ./release.ps1 promote                        # Promote pre-release to full release
-#   ./release.ps1 hotfix                         # Create a hotfix
+#   ./release.ps1 hotfix  
 
 param(
     [Parameter(Position = 0)]
@@ -41,8 +41,8 @@ function Write-Status {
 }
 
 # Validate inputs and parameters
-if ($VersionType -notin @("major", "minor", "patch", "promote", "hotfix")) {
-    Write-Status "Invalid version type. Use major, minor, patch, promote, or hotfix." "error"
+if ($VersionType -notin @("major", "minor", "patch", "promote", "hotfix", "none")) {
+    Write-Status "Invalid version type. Use major, minor, patch, promote, hotfix, or none." "error"
     exit 1
 }
 
