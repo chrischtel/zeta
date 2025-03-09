@@ -109,7 +109,7 @@ if ($gitStatus) {
 }
 
 # Get current version from build.zig
-$versionPattern = 'const VERSION = "([^"]+)"'
+$versionPattern = '(?m)^const VERSION = "([^"]+)"'
 try {
     $buildContent = Get-Content -Path "build.zig" -Raw
     $match = [regex]::Match($buildContent, $versionPattern)
