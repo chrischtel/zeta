@@ -55,7 +55,7 @@ pub const FilePermissions = struct {
         var buf: [10]u8 = undefined;
 
         if (builtin.os.tag == .windows) {
-            // Windows-style attributes
+            // Windows-style attributess
             buf[0] = if (self.readable) @as(u8, 'R') else @as(u8, '-');
             buf[1] = if (self.writable) @as(u8, 'W') else @as(u8, '-');
             buf[2] = if (self.hidden) @as(u8, 'H') else @as(u8, '-');
