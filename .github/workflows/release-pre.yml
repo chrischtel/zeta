@@ -72,6 +72,7 @@ jobs:
         run: zig build build-${{ matrix.platform }} -Doptimize=ReleaseFast
       
       - name: Package binaries
+        shell: bash
         run: |
           mkdir -p dist
           
