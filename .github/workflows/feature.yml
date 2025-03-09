@@ -1,0 +1,47 @@
+name: Feature Branch
+
+on:
+  push:
+    branches: [ 'feature/*', 'bugfix/*' ]
+  pull_request:
+    branches: [ develop ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.11.0
+      
+      - name: Build
+        run: zig build
+        
+      - name: Test
+        run: zig build test
+        
+      - name: Extract branch name
+        id: extract_branch
+        run: echo "BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_OUTPUT
+          
+      - name: Create debug build artifacts
+        if: github.event_name == 'push'
+        run: |
+          mkdir -p debug-artifacts
+          
+          # Build with debug info
+          zig build -Doptimize=Debug
+          
+          # Create debug artifact of current branch
+          tar czf "debug-artifacts/zeta-debug-${{ steps.extract_branch.outputs.BRANCH_NAME }}.tar.gz" zig-out/bin/
+          
+      - name: Upload debug artifacts
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v3
+        with:
+          name: debug-build
+          path: debug-artifacts/
+          retention-days: 7

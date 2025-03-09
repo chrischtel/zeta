@@ -1,0 +1,53 @@
+name: Hotfix Validation
+
+on:
+  push:
+    branches: [ 'hotfix/*' ]
+  pull_request:
+    branches: [ main ]
+    
+jobs:
+  validate-hotfix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.11.0
+      
+      - name: Run tests
+        run: zig build test
+        
+      - name: Validate version increment
+        run: |
+          # Extract version from build.zig
+          CURRENT_VERSION=$(grep -oP 'const VERSION = "\K[^"]+' build.zig)
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Check if version includes build metadata (for hotfixes)
+          if [[ ! "$CURRENT_VERSION" == *"+"* ]]; then
+            echo "::warning::Hotfix versions should include build metadata (+git-hash)"
+          fi
+          
+          # Get the latest release version from GitHub
+          git fetch --tags
+          LATEST_RELEASE=$(git describe --tags --match "v[0-9]*.[0-9]*.[0-9]*" --abbrev=0)
+          LATEST_VERSION=${LATEST_RELEASE#v}
+          echo "Latest released version: $LATEST_VERSION"
+          
+          # Compare versions (only patch should be incremented)
+          IFS='.' read -r CURR_MAJOR CURR_MINOR CURR_PATCH_FULL <<< "$CURRENT_VERSION"
+          CURR_PATCH=${CURR_PATCH_FULL%%[+-]*}  # Remove any pre-release or build metadata
+          
+          IFS='.' read -r PREV_MAJOR PREV_MINOR PREV_PATCH_FULL <<< "$LATEST_VERSION"
+          PREV_PATCH=${PREV_PATCH_FULL%%[+-]*}
+          
+          if [ "$CURR_MAJOR" != "$PREV_MAJOR" ] || [ "$CURR_MINOR" != "$PREV_MINOR" ]; then
+            echo "::warning::Hotfixes should only increment the patch version"
+          fi
+          
+          if [ "$CURR_PATCH" -le "$PREV_PATCH" ]; then
+            echo "::warning::Hotfix patch version should be greater than the previous version"
+          fi

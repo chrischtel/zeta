@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'  # Standard releases (excluding pre-releases)
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.11.0
+      
+      - name: Extract version & check for hotfix
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Check if this is a hotfix (version has build metadata)
+          if [[ "$VERSION" == *"+"* ]]; then
+            echo "IS_HOTFIX=true" >> $GITHUB_OUTPUT
+          else
+            echo "IS_HOTFIX=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Extract changelog
+        id: changelog
+        run: |
+          CHANGELOG=$(sed -n "/# ${{ steps.version.outputs.VERSION }}/,/# /p" CHANGELOG.md | sed '1,1d;$d')
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Build all platforms
+        run: zig build build-all
+      
+      - name: Create release artifacts
+        run: |
+          mkdir -p release
+          
+          for platform in linux-x86_64 macos-aarch64 windows-x86_64; do
+            mkdir -p "tmp-$platform/bin"
+            
+            # Copy both minimal and full executables
+            cp "zig-out/bin/$platform/zeta" "tmp-$platform/bin/"
+            cp "zig-out/bin/$platform/zetaf" "tmp-$platform/bin/"
+            
+            # Create a README explaining the versions
+            cat > "tmp-$platform/README.txt" << EOF
+          Zeta ${{ steps.version.outputs.VERSION }} - $platform
+          
+          This package contains two versions:
+          - zeta: Minimal version with core functionality
+          - zetaf: Full-featured version with all capabilities
+          
+          For most users, we recommend using the full version (zetaf).
+          EOF
+            
+            # Package differently based on platform
+            if [[ "$platform" == "windows-x86_64" ]]; then
+              # Add .exe extension for Windows files
+              mv "tmp-$platform/bin/zeta" "tmp-$platform/bin/zeta.exe"
+              mv "tmp-$platform/bin/zetaf" "tmp-$platform/bin/zetaf.exe"
+              
+              # Create shortcut batch files
+              echo "@echo off" > "tmp-$platform/zeta.bat"
+              echo "bin\\zeta.exe %*" >> "tmp-$platform/zeta.bat"
+              
+              echo "@echo off" > "tmp-$platform/zetaf.bat"
+              echo "bin\\zetaf.exe %*" >> "tmp-$platform/zetaf.bat"
+              
+              # Create zip archive
+              cd "tmp-$platform"
+              zip -r "../release/zeta-${{ steps.version.outputs.VERSION }}-$platform.zip" .
+              cd ..
+            else
+              # Create shell scripts
+              echo '#!/bin/sh' > "tmp-$platform/zeta"
+              echo './bin/zeta "$@"' >> "tmp-$platform/zeta"
+              chmod +x "tmp-$platform/zeta"
+              
+              echo '#!/bin/sh' > "tmp-$platform/zetaf"
+              echo './bin/zetaf "$@"' >> "tmp-$platform/zetaf"
+              chmod +x "tmp-$platform/zetaf"
+              
+              # Create symlink for alias
+              cd "tmp-$platform"
+              ln -sf "zetaf" "z"
+              
+              # Create tarball
+              tar czf "../release/zeta-${{ steps.version.outputs.VERSION }}-$platform.tar.gz" .
+              cd ..
+            fi
+          done
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ steps.version.outputs.IS_HOTFIX == 'true' && format('Zeta {0} (Hotfix)', steps.version.outputs.VERSION) || format('Zeta {0}', steps.version.outputs.VERSION) }}
+          body: |
+            # Zeta ${{ steps.version.outputs.VERSION }} ${{ steps.version.outputs.IS_HOTFIX == 'true' && '(Hotfix)' || '' }}
+            
+            This release includes both minimal (`zeta`) and full-featured (`zetaf`) versions.
+            
+            ## Changes
+            
+            ${{ steps.changelog.outputs.CHANGELOG }}
+            
+            ## Installation
+            
+            1. Download the appropriate package for your platform
+            2. Extract the archive
+            3. Run either `zeta` (minimal) or `zetaf` (full) from the extracted directory
+          draft: false
+          prerelease: false
+          files: |
+            release/zeta-${{ steps.version.outputs.VERSION }}-*.zip
+            release/zeta-${{ steps.version.outputs.VERSION }}-*.tar.gz

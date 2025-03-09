@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop, 'release/*', 'feature/*', 'bugfix/*', 'hotfix/*' ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+  pull_request:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+      
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.11.0
+      
+      - name: Build both versions
+        run: zig build
+      
+      - name: Test all modules
+        run: zig build test
+        
+      - name: Determine branch type
+        id: branch-type
+        run: |
+          BRANCH=${{ github.ref_name }}
+          if [[ "$BRANCH" == "main" ]]; then
+            echo "type=production" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == "develop" ]]; then
+            echo "type=development" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == release/* ]]; then
+            echo "type=release" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == hotfix/* ]]; then
+            echo "type=hotfix" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == feature/* || "$BRANCH" == bugfix/* ]]; then
+            echo "type=feature" >> $GITHUB_OUTPUT
+          else
+            echo "type=other" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+      
+      - name: Notify status
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const script = require('.github/scripts/notify.js')
+            await script({github, context, core})
