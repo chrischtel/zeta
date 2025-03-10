@@ -2,7 +2,7 @@ const std = @import("std");
 
 // Constants for project configuration
 const PROJECT_NAME = "zeta";
-const VERSION = "0.0.0-alpha.7+4f1d4f5";
+const VERSION = "0.0.0-alpha.8+18328a9";
 
 const VersionParts = struct {
     core: []const u8,

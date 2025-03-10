@@ -1,14 +1,17 @@
 # Changelog
 
-# 0.0.0-alpha.7+4f1d4f5 (alpha)
+# 0.0.0-alpha.8+18328a9 (alpha)
 
-Released on 2025-03-10 (changes since 2025-03-09)
+Released on 2025-03-10 (changes since 2025-03-10)
 
-### New Features
+### Bug Fixes
 
-- feat: imroved changelog
+- fix: join error in release script
 
 
+### Contributors
+
+- chrischtel - Christian Brendlin
 
 
 ## Older Releases
