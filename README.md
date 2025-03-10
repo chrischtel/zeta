@@ -1,7 +1,7 @@
 # Zeta
 
 [![Build Status](https://github.com/chrischtel/zeta/workflows/CI/badge.svg)](https://github.com/chrischtel/zeta/actions)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/chrischtel/zeta)](https://github.com/chrischtel/zeta/releases)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/chrischtel/zeta?include_prereleases)](https://github.com/chrischtel/zeta/releases)
 [![Zig](https://img.shields.io/badge/Zig-0.14.0+-blue.svg)](https://ziglang.org/)
 [![License](https://img.shields.io/github/license/chrischtel/zeta)](LICENSE)
 [![GitHub issues](https://img.shields.io/github/issues/chrischtel/zeta)](https://github.com/chrischtel/zeta/issues)
