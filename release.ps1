@@ -343,7 +343,8 @@ if ($lastTag) {
 
 if ($contributors.Count -gt 0) {
     $contributorsSection = "`n### Contributors`n`n" + 
-                           ($contributors | ForEach-Object { "- $_" } | Join-String -Separator "`n")
+    ($contributors | ForEach-Object { "- $_" }) -join "`n"
+
     $changelogText = $changelogHeader + ($changes -join "`n") + "`n" + $contributorsSection + "`n`n"
 }
 else {
