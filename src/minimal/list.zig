@@ -57,7 +57,7 @@ pub fn listDirectory(
         defer allocator.free(time_str);
 
         // Get file icon based on Unicode preference
-        _ = style.getFileIcon(entry.file_type, entry.extension, style_config.use_unicode);
+        _ = style.getFileIcon(entry.file_type, entry.extension, style_config);
 
         // Format padded name (truncate if too long)
         const display_name = if (entry.name.len > 28)

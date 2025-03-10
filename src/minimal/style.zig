@@ -117,7 +117,7 @@ pub fn shouldUseColor(no_color: bool) bool {
     if (no_color_env.len > 0) return false;
 
     // Check if stdout is a terminal
-    const is_tty = std.io.getStdOut().isTty() catch false;
+    const is_tty = std.io.getStdOut().isTty();
     if (!is_tty) return false;
 
     return true;
@@ -161,44 +161,58 @@ pub fn getFileIcon(file_type: fs.FileType, extension: []const u8, config: StyleC
 
 // Get icon for regular files based on extension
 fn getFileIconByExtension(extension: []const u8) []const u8 {
-    const map = std.ComptimeStringMap([]const u8, .{
-        .{ "pdf", Icons.unicode.pdf },
-        .{ "txt", Icons.unicode.doc },
-        .{ "md", Icons.unicode.doc },
-        .{ "doc", Icons.unicode.doc },
-        .{ "docx", Icons.unicode.doc },
-        .{ "zip", Icons.unicode.archive },
-        .{ "rar", Icons.unicode.archive },
-        .{ "gz", Icons.unicode.archive },
-        .{ "tar", Icons.unicode.archive },
-        .{ "7z", Icons.unicode.archive },
-        .{ "mp3", Icons.unicode.audio },
-        .{ "wav", Icons.unicode.audio },
-        .{ "ogg", Icons.unicode.audio },
-        .{ "flac", Icons.unicode.audio },
-        .{ "mp4", Icons.unicode.video },
-        .{ "avi", Icons.unicode.video },
-        .{ "mkv", Icons.unicode.video },
-        .{ "mov", Icons.unicode.video },
-        .{ "webm", Icons.unicode.video },
-        .{ "jpg", Icons.unicode.image },
-        .{ "jpeg", Icons.unicode.image },
-        .{ "png", Icons.unicode.image },
-        .{ "gif", Icons.unicode.image },
-        .{ "bmp", Icons.unicode.image },
-        .{ "svg", Icons.unicode.image },
-        .{ "webp", Icons.unicode.image },
-        .{ "exe", Icons.unicode.executable },
-        .{ "bat", Icons.unicode.executable },
-        .{ "cmd", Icons.unicode.executable },
-        .{ "sh", Icons.unicode.script },
-        .{ "bash", Icons.unicode.script },
-        .{ "zsh", Icons.unicode.script },
-        .{ "fish", Icons.unicode.script },
-        .{ "zig", Icons.unicode.zig },
-    });
+    // Documents
+    if (std.mem.eql(u8, extension, "pdf")) return Icons.unicode.pdf;
+    if (std.mem.eql(u8, extension, "txt") or
+        std.mem.eql(u8, extension, "md") or
+        std.mem.eql(u8, extension, "doc") or
+        std.mem.eql(u8, extension, "docx")) return Icons.unicode.doc;
 
-    return map.get(extension) orelse Icons.unicode.regular;
+    // Archives
+    if (std.mem.eql(u8, extension, "zip") or
+        std.mem.eql(u8, extension, "rar") or
+        std.mem.eql(u8, extension, "gz") or
+        std.mem.eql(u8, extension, "tar") or
+        std.mem.eql(u8, extension, "7z")) return Icons.unicode.archive;
+
+    // Audio
+    if (std.mem.eql(u8, extension, "mp3") or
+        std.mem.eql(u8, extension, "wav") or
+        std.mem.eql(u8, extension, "ogg") or
+        std.mem.eql(u8, extension, "flac")) return Icons.unicode.audio;
+
+    // Video
+    if (std.mem.eql(u8, extension, "mp4") or
+        std.mem.eql(u8, extension, "avi") or
+        std.mem.eql(u8, extension, "mkv") or
+        std.mem.eql(u8, extension, "mov") or
+        std.mem.eql(u8, extension, "webm")) return Icons.unicode.video;
+
+    // Images
+    if (std.mem.eql(u8, extension, "jpg") or
+        std.mem.eql(u8, extension, "jpeg") or
+        std.mem.eql(u8, extension, "png") or
+        std.mem.eql(u8, extension, "gif") or
+        std.mem.eql(u8, extension, "bmp") or
+        std.mem.eql(u8, extension, "svg") or
+        std.mem.eql(u8, extension, "webp")) return Icons.unicode.image;
+
+    // Executables
+    if (std.mem.eql(u8, extension, "exe") or
+        std.mem.eql(u8, extension, "bat") or
+        std.mem.eql(u8, extension, "cmd")) return Icons.unicode.executable;
+
+    // Scripts
+    if (std.mem.eql(u8, extension, "sh") or
+        std.mem.eql(u8, extension, "bash") or
+        std.mem.eql(u8, extension, "zsh") or
+        std.mem.eql(u8, extension, "fish")) return Icons.unicode.script;
+
+    // Zig
+    if (std.mem.eql(u8, extension, "zig")) return Icons.unicode.zig;
+
+    // Default
+    return Icons.unicode.regular;
 }
 
 // Get color for file type
@@ -218,55 +232,75 @@ pub fn getColorForFileType(file_type: fs.FileType, config: StyleConfig) []const 
 pub fn getColorForExtension(extension: []const u8, config: StyleConfig) []const u8 {
     if (!config.use_color) return "";
 
-    const map = std.ComptimeStringMap([]const u8, .{
-        // Executable files
-        .{ "exe", Color.bold_green },
-        .{ "sh", Color.bold_green },
-        .{ "bat", Color.bold_green },
-        .{ "cmd", Color.bold_green },
+    // Executable files
+    if (std.mem.eql(u8, extension, "exe") or
+        std.mem.eql(u8, extension, "sh") or
+        std.mem.eql(u8, extension, "bat") or
+        std.mem.eql(u8, extension, "cmd"))
+    {
+        return Color.bold_green;
+    }
 
-        // Archives
-        .{ "zip", Color.red },
-        .{ "tar", Color.red },
-        .{ "gz", Color.red },
-        .{ "rar", Color.red },
-        .{ "7z", Color.red },
+    // Archives
+    if (std.mem.eql(u8, extension, "zip") or
+        std.mem.eql(u8, extension, "tar") or
+        std.mem.eql(u8, extension, "gz") or
+        std.mem.eql(u8, extension, "rar") or
+        std.mem.eql(u8, extension, "7z"))
+    {
+        return Color.red;
+    }
 
-        // Images
-        .{ "jpg", Color.magenta },
-        .{ "jpeg", Color.magenta },
-        .{ "png", Color.magenta },
-        .{ "gif", Color.magenta },
-        .{ "bmp", Color.magenta },
-        .{ "svg", Color.magenta },
+    // Images
+    if (std.mem.eql(u8, extension, "jpg") or
+        std.mem.eql(u8, extension, "jpeg") or
+        std.mem.eql(u8, extension, "png") or
+        std.mem.eql(u8, extension, "gif") or
+        std.mem.eql(u8, extension, "bmp") or
+        std.mem.eql(u8, extension, "svg"))
+    {
+        return Color.magenta;
+    }
 
-        // Documents
-        .{ "pdf", Color.cyan },
-        .{ "doc", Color.cyan },
-        .{ "docx", Color.cyan },
-        .{ "txt", Color.white },
-        .{ "md", Color.white },
+    // Documents
+    if (std.mem.eql(u8, extension, "pdf") or
+        std.mem.eql(u8, extension, "doc") or
+        std.mem.eql(u8, extension, "docx"))
+    {
+        return Color.cyan;
+    }
 
-        // Code files
-        .{ "zig", Color.yellow },
-        .{ "c", Color.yellow },
-        .{ "cpp", Color.yellow },
-        .{ "h", Color.yellow },
-        .{ "hpp", Color.yellow },
-        .{ "js", Color.yellow },
-        .{ "py", Color.yellow },
-        .{ "rs", Color.yellow },
-        .{ "go", Color.yellow },
-        .{ "java", Color.yellow },
+    if (std.mem.eql(u8, extension, "txt") or
+        std.mem.eql(u8, extension, "md"))
+    {
+        return Color.white;
+    }
 
-        // Media
-        .{ "mp3", Color.bold_magenta },
-        .{ "wav", Color.bold_magenta },
-        .{ "mp4", Color.bold_magenta },
-        .{ "avi", Color.bold_magenta },
-    });
+    // Code files
+    if (std.mem.eql(u8, extension, "zig") or
+        std.mem.eql(u8, extension, "c") or
+        std.mem.eql(u8, extension, "cpp") or
+        std.mem.eql(u8, extension, "h") or
+        std.mem.eql(u8, extension, "hpp") or
+        std.mem.eql(u8, extension, "js") or
+        std.mem.eql(u8, extension, "py") or
+        std.mem.eql(u8, extension, "rs") or
+        std.mem.eql(u8, extension, "go") or
+        std.mem.eql(u8, extension, "java"))
+    {
+        return Color.yellow;
+    }
 
-    return map.get(extension) orelse Color.reset;
+    // Media
+    if (std.mem.eql(u8, extension, "mp3") or
+        std.mem.eql(u8, extension, "wav") or
+        std.mem.eql(u8, extension, "mp4") or
+        std.mem.eql(u8, extension, "avi"))
+    {
+        return Color.bold_magenta;
+    }
+
+    return Color.reset;
 }
 
 // Get reset code for colors
