@@ -1,12 +1,13 @@
 const std = @import("std");
+const style = @import("style.zig");
 
 pub fn printHeader(writer: std.fs.File.Writer, use_unicode: bool) !void {
-    const top_left = if (use_unicode) "┏" else "+";
-    const horizontal = if (use_unicode) "━" else "-";
-    const top_right = if (use_unicode) "┓" else "+";
-    const vertical = if (use_unicode) "┃" else "|";
-    const mid_left = if (use_unicode) "┣" else "+";
-    const mid_right = if (use_unicode) "┫" else "+";
+    const top_left = style.Border.get("top_left", use_unicode);
+    const horizontal = style.Border.get("horizontal", use_unicode);
+    const top_right = style.Border.get("top_right", use_unicode);
+    const vertical = style.Border.get("vertical", use_unicode);
+    const mid_left = style.Border.get("mid_left", use_unicode);
+    const mid_right = style.Border.get("mid_right", use_unicode);
 
     try writer.print("{s}", .{top_left});
     // Print a sequence of horizontal characters (for approximately 70 columns)
