@@ -48,24 +48,41 @@ function Get-MeaningfulChanges {
     $features = @()
     $fixes = @()
     $other = @()
+    $breaking = @()
     
     foreach ($msg in $CommitMessages) {
+        # Look for breaking changes first
+        if ($msg -match '^\- (feat|fix|perf|refactor)!:') {
+            $breaking += $msg -replace '^\- (feat|fix|perf|refactor)!:', '- '
+            continue
+        }
+        
         # Only include conventionally formatted commits
-        if ($msg -match '^\- (feat|fix|perf|refactor|hotfix):') {
+        if ($msg -match '^\- (feat|fix|perf|refactor|docs|style|test|ci|chore|hotfix):') {
+            # Clean up the message a bit
+            $cleanMsg = $msg -replace '^\- ', '- '
+            
             # Categorize changes
             if ($msg -match '^\- (fix|hotfix):') {
-                $fixes += $msg
+                $fixes += $cleanMsg
             }
             elseif ($msg -match '^\- feat:') {
-                $features += $msg
+                $features += $cleanMsg
             }
-            else {
-                $other += $msg
+            elseif ($msg -match '^\- (perf|refactor):') {
+                $other += $cleanMsg
             }
         }
     }
     
     $result = @()
+    
+    if ($breaking.Count -gt 0) {
+        $result += "### ⚠️ BREAKING CHANGES"
+        $result += ""
+        $result += $breaking
+        $result += ""
+    }
     
     if ($features.Count -gt 0) {
         $result += "### New Features"
@@ -266,11 +283,15 @@ if (Test-Path "build.zig.zon") {
 try {
     # Get the latest tag
     $lastTag = git describe --tags --abbrev=0 2>$null
+    $lastTagDate = git log -1 --format=%ai $lastTag 2>$null
+    $lastTagDateFormatted = if ($lastTagDate) { [DateTime]::Parse($lastTagDate).ToString("yyyy-MM-dd") } else { "" }
 }
 catch {
     $lastTag = ""
+    $lastTagDateFormatted = ""
 }
 
+# Create changelog header
 $changelogHeader = "# $newVersion"
 if ($Pre) {
     $changelogHeader += " ($Pre)"
@@ -278,52 +299,103 @@ if ($Pre) {
 elseif ($Hotfix) {
     $changelogHeader += " (Hotfix)"
 }
-$changelogHeader += "`n`nReleased on $(Get-Date -Format "yyyy-MM-dd")`n`n"
 
-# Get conventional commits from git log
+$releaseDate = Get-Date -Format "yyyy-MM-dd"
+$changelogHeader += "`n`nReleased on $releaseDate"
+if ($lastTagDateFormatted) {
+    $changelogHeader += " (changes since $lastTagDateFormatted)"
+}
+$changelogHeader += "`n`n"
+
+# Get conventional commits from git log with more details
 if ($lastTag) {
-    $rawChanges = git log --pretty=format:"- %s" "$lastTag..HEAD"
+    $rawCommits = git log --pretty=format:"%s|%h|%an" "$lastTag..HEAD"
 }
 else {
-    $rawChanges = git log --pretty=format:"- %s"
+    $rawCommits = git log --pretty=format:"%s|%h|%an" -n 50  # Limit to last 50 commits if no tags exist
+}
+
+# Process commits to include hash links
+$processedCommits = @()
+foreach ($commit in $rawCommits) {
+    $parts = $commit -split '\|'
+    if ($parts.Count -ge 2) {
+        $message = $parts[0]
+        $hash = $parts[1]
+        $author = if ($parts.Count -ge 3) { $parts[2] } else { "" }
+        
+        # Keep just the original format for processing
+        $processedCommits += "- $message"
+    }
 }
 
 # Filter to only include meaningful changes
-$changes = Get-MeaningfulChanges -CommitMessages $rawChanges
+$changes = Get-MeaningfulChanges -CommitMessages $processedCommits
 if ($changes.Count -eq 0) {
     $changes = @("- No significant changes in this release")
 }
 
-$changelogText = $changelogHeader + ($changes -join "`n") + "`n`n"
+# Add contributors section
+$contributors = @()
+if ($lastTag) {
+    $contributors = git log "$lastTag..HEAD" --format="%an" | Sort-Object -Unique
+}
 
-# Add this to your script, replacing the existing changelog code
+if ($contributors.Count -gt 0) {
+    $contributorsSection = "`n### Contributors`n`n" + 
+                           ($contributors | ForEach-Object { "- $_" } | Join-String -Separator "`n")
+    $changelogText = $changelogHeader + ($changes -join "`n") + "`n" + $contributorsSection + "`n`n"
+}
+else {
+    $changelogText = $changelogHeader + ($changes -join "`n") + "`n`n"
+}
+
+# Backup existing changelog
 if (Test-Path "CHANGELOG.md") {
+    Copy-Item "CHANGELOG.md" "CHANGELOG.md.bak"
+    Write-Status "Created backup of CHANGELOG.md" "info"
+    
+    # Check if version already exists in changelog
+    $existingChangelog = Get-Content -Path "CHANGELOG.md" -Raw
+    if ($existingChangelog -match "# $newVersion(\s|\(|$)") {
+        Write-Status "Version $newVersion already exists in changelog" "warning"
+        $overwrite = Read-Host "Do you want to overwrite it? (y/N)"
+        if ($overwrite -ne "y" -and $overwrite -ne "Y") {
+            Write-Status "Keeping existing changelog entry" "info"
+            Remove-Item "CHANGELOG.md.bak"
+            return
+        }
+    }
+    
     # Extract title and header
     $title = "# Changelog"
     
     # Extract existing release entries (each starts with "# X.X.X")
     $pattern = "(?s)# \d+\.\d+\.\d+.*?(?=# \d+\.\d+\.\d+|$)"
-    $existingChangelog = Get-Content -Path "CHANGELOG.md" -Raw
     $entries = [regex]::Matches($existingChangelog, $pattern)
     
-    # Keep only the 7 most recent entries (adjust as needed)
-    $maxEntries = 7
+    # Keep only the specified number of recent entries
     $recentEntries = @()
     $count = 0
     
     foreach ($entry in $entries) {
-        if ($count -lt $maxEntries - 1) {
+        # Skip if this is the same version we're currently releasing
+        if ($entry.Value -match "^# $newVersion(\s|\(|$)") {
+            continue
+        }
+        
+        if ($count -lt $MaxChangelogEntries - 1) {
             # -1 to account for the new entry
             $recentEntries += $entry.Value
         }
         $count++
-        if ($count -ge $maxEntries - 1) {
+        if ($count -ge $MaxChangelogEntries - 1) {
             break
         }
     }
     
     # Add a note about older releases
-    $footer = "`n## Older Releases\n\nFor older releases, please see the [GitHub Releases page](https://github.com/YOUR_USERNAME/zeta/releases).\n"
+    $footer = "`n## Older Releases`n`nFor older releases, please see the [GitHub Releases page](https://github.com/$RepoOwner/$RepoName/releases).`n"
     
     # Combine everything
     $joinedEntries = $recentEntries -join ""
