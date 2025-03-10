@@ -14,10 +14,12 @@ pub fn listDirectory(
     show_hidden: bool,
     sort_method: types.SortMethod,
     reverse: bool,
-    use_color: bool,
-    use_unicode: bool,
+    no_color: bool,
+    force_ascii: bool,
 ) !void {
     const stdout = std.io.getStdOut().writer();
+
+    const style_config = style.createStyleConfig(no_color, force_ascii);
 
     // Read directory entries
     const entries = try fs.readDirectory(allocator, path, .{
@@ -34,13 +36,13 @@ pub fn listDirectory(
     }, sort.compareEntries);
 
     // Print header with Unicode option
-    try display.printHeader(stdout, use_unicode);
+    try display.printHeader(stdout, style_config.use_unicode);
 
     // Track count of displayed items
     var count: usize = 0;
 
     // Get vertical border character
-    const vertical = if (use_unicode) "┃" else "|";
+    const vertical = if (style_config.use_unicode) "┃" else "|";
 
     // Print entries
     for (entries) |entry| {
@@ -55,7 +57,7 @@ pub fn listDirectory(
         defer allocator.free(time_str);
 
         // Get file icon based on Unicode preference
-        const icon = style.getFileIcon(entry.file_type, entry.extension, use_unicode);
+        _ = style.getFileIcon(entry.file_type, entry.extension, style_config.use_unicode);
 
         // Format padded name (truncate if too long)
         const display_name = if (entry.name.len > 28)
@@ -71,20 +73,15 @@ pub fn listDirectory(
         const permissions_str = try format.formatPermissions(allocator, entry.permissions, entry.file_type);
         defer allocator.free(permissions_str);
 
-        // Get color code based on file type or extension
-        const color_code = if (entry.file_type == .regular)
-            style.getColorForExtension(entry.extension, use_color)
-        else
-            style.getColorForFileType(entry.file_type, use_color);
-
-        const reset_code = if (use_color) style.getResetCode() else "";
+        // Get style for this entry in one call
+        const entry_style = style.EntryStyle.create(entry, style_config);
 
         try stdout.print("{s} {s}{s}{s}{s} {s} {s} {s} {s}\n", .{
             vertical,
-            color_code,
-            icon,
+            entry_style.color,
+            entry_style.icon,
             display_name,
-            reset_code,
+            entry_style.reset,
             padded_size,
             permissions_str,
             time_str,
@@ -93,5 +90,5 @@ pub fn listDirectory(
     }
 
     // Print footer
-    try display.printFooter(stdout, count, use_unicode);
+    try display.printFooter(stdout, count, style_config.use_unicode);
 }
