@@ -1,0 +1,97 @@
+const std = @import("std");
+const zeta_core = @import("zeta_core");
+const types = @import("types.zig");
+const style = @import("style.zig");
+const sort = @import("sort.zig");
+const display = @import("display.zig");
+
+const fs = zeta_core.fs;
+const format = zeta_core.format;
+
+pub fn listDirectory(
+    allocator: std.mem.Allocator,
+    path: []const u8,
+    show_hidden: bool,
+    sort_method: types.SortMethod,
+    reverse: bool,
+    use_color: bool,
+    use_unicode: bool,
+) !void {
+    const stdout = std.io.getStdOut().writer();
+
+    // Read directory entries
+    const entries = try fs.readDirectory(allocator, path, .{
+        .include_hidden = show_hidden,
+        .follow_symlinks = false,
+    });
+    defer fs.freeDirectoryEntries(allocator, entries);
+
+    // Sort entries
+    std.sort.insertion(fs.FileEntry, entries, types.SortContext{
+        .method = sort_method,
+        .dirs_first = true,
+        .reverse = reverse,
+    }, sort.compareEntries);
+
+    // Print header with Unicode option
+    try display.printHeader(stdout, use_unicode);
+
+    // Track count of displayed items
+    var count: usize = 0;
+
+    // Get vertical border character
+    const vertical = if (use_unicode) "┃" else "|";
+
+    // Print entries
+    for (entries) |entry| {
+        count += 1;
+
+        // Format size
+        const size_str = try format.formatSize(allocator, entry.size);
+        defer allocator.free(size_str);
+
+        // Format time
+        const time_str = try format.formatTime(allocator, entry.mtime);
+        defer allocator.free(time_str);
+
+        // Get file icon based on Unicode preference
+        const icon = style.getFileIcon(entry.file_type, entry.extension, use_unicode);
+
+        // Format padded name (truncate if too long)
+        const display_name = if (entry.name.len > 28)
+            try std.fmt.allocPrint(allocator, "{s}...", .{entry.name[0..25]})
+        else
+            try std.fmt.allocPrint(allocator, "{s: <28}", .{entry.name});
+        defer allocator.free(display_name);
+
+        // Format padded size
+        const padded_size = try std.fmt.allocPrint(allocator, "{s: >10}", .{size_str});
+        defer allocator.free(padded_size);
+
+        const permissions_str = try format.formatPermissions(allocator, entry.permissions, entry.file_type);
+        defer allocator.free(permissions_str);
+
+        // Get color code based on file type or extension
+        const color_code = if (entry.file_type == .regular)
+            style.getColorForExtension(entry.extension, use_color)
+        else
+            style.getColorForFileType(entry.file_type, use_color);
+
+        const reset_code = if (use_color) style.getResetCode() else "";
+
+        try stdout.print("{s} {s}{s}{s}{s} {s} {s} {s} {s}\n", .{
+            vertical,
+            color_code,
+            icon,
+            display_name,
+            reset_code,
+            padded_size,
+            permissions_str,
+            time_str,
+            vertical,
+        });
+    }
+
+    // Print footer
+    try display.printFooter(stdout, count, use_unicode);
+}
